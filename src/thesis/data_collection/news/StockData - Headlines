@@ -1,0 +1,45 @@
+import requests
+import pandas as pd
+from datetime import datetime, timedelta, timezone
+import time
+
+API_TOKEN = 'M3F3kC6r0Icz1sA1t70zwy4k8wc6UzpslRiRJpyr'
+symbol = 'NVDA'
+days_back = 1825
+max_per_day = 25
+
+# Start from today and go back
+end_date = datetime.now(timezone.utc)
+
+all_articles = []
+
+for i in range(days_back):
+    day = end_date - timedelta(days=i)
+    date_str = day.strftime('%Y-%m-%d')
+
+    url = 'https://api.stockdata.org/v1/news/all'
+    params = {
+        'api_token': API_TOKEN,
+        'symbols': symbol,
+        'date_from': date_str,
+        'date_to': date_str,
+        'limit': max_per_day,
+        'sort': 'asc'
+    }
+
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        news_data = response.json().get('data', [])
+        for article in news_data:
+            article['date'] = date_str
+        all_articles.extend(news_data)
+        print(f"[{date_str}] Retrieved {len(news_data)} articles.")
+    else:
+        print(f"[{date_str}] Failed: {response.status_code}")
+
+    time.sleep(1)  # Be respectful to API rate limits
+
+# Save all collected news to CSV
+df = pd.DataFrame(all_articles)
+df.to_csv(f'{symbol}_5yr_news.csv', index=False)
+print(f"Saved total {len(df)} articles to {symbol}_5yr_news.csv")

@@ -1,0 +1,33 @@
+# environments / secrets
+.venv/
+venv/
+.env
+*.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# data - do not upload raw/proprietary data
+data/raw/
+data/interim/
+data/processed/
+data/model_feed/*.csv
+data/model_feed/*.xlsx
+artifacts/data/
+*.parquet
+
+# trained models / large artifacts
+models/
+mlruns/
+*.keras
+*.h5
+*.pt
+*.pkl
+*.joblib
+*.npy
+
+# local/debug files
+misc/Error.txt
+.DS_Store
+Thumbs.db
+src/*.egg-info/

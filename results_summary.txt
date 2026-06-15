@@ -1,0 +1,96 @@
+============================================================
+THESIS RESULTS SUMMARY
+============================================================
+
+FILE: /home/zammorak/thesis/models/walk_forward_base_bestparams/walk_forward_summary_base_best.json
+AUC: 0.54694157636883
+ACC: 0.5238095238095238
+Sharpe: 1.441708398754296
+Trade rate: 0.39087301587301587
+
+FILE: /home/zammorak/thesis/models/walk_forward_direction/walk_forward_summary_features.json
+AUC: 0.5338876210842124
+ACC: 0.5059523809523809
+Sharpe: 1.8332145114125356
+Trade rate: 0.43253968253968256
+
+FILE: /home/zammorak/thesis/models/walk_forward_test/walk_forward_summary.json
+AUC: 0.4999122289070105
+ACC: 0.5218253968253969
+Sharpe: 0.9148768153995286
+Trade rate: 0.5595238095238095
+
+FILE: /home/zammorak/thesis/models/walk_forward_direction_bestparams/walk_forward_summary_best_features.json
+AUC: 0.550643920654932
+ACC: 0.5178571428571429
+Sharpe: 0.9957887190041333
+Trade rate: 0.5396825396825397
+
+FILE: /home/zammorak/thesis/models/walk_forward_base/walk_forward_summary_base.json
+AUC: 0.5246796355105884
+ACC: 0.5059523809523809
+Sharpe: 1.626789892735907
+Trade rate: 0.373015873015873
+
+FILE: /home/zammorak/thesis/models/walk_forward_small_model/walk_forward_summary.json
+AUC: 0.5184239503375198
+ACC: 0.4861111111111111
+Sharpe: 0.47344470279115486
+Trade rate: 0.2896825396825397
+
+FILE: /home/zammorak/thesis/models/walk_forward_small_t0525/walk_forward_summary.json
+AUC: 0.5187112011873035
+ACC: 0.49007936507936506
+Sharpe: 1.006539675885208
+Trade rate: 0.3611111111111111
+
+FILE: /home/zammorak/thesis/models/walk_forward_reduced_t0525/walk_forward_summary.json
+AUC: 0.535818585129981
+ACC: 0.4880952380952381
+Sharpe: 1.6274319723654838
+Trade rate: 0.3115079365079365
+
+FILE: /home/zammorak/thesis/models/random_search_direction_v2/random_search_results.csv
+Best val_auc: 0.5797979797979798
+Best val_acc: 0.5238095238095238
+
+FILE: /home/zammorak/thesis/models/random_search_base/random_search_results.csv
+Best val_auc: 0.5651515151515152
+Best val_acc: 0.4761904761904761
+
+FILE: /home/zammorak/thesis/models/random_search_test_10/random_search_results.csv
+Best val_auc: 0.5507575757575758
+Best val_acc: 0.5238095238095238
+
+FILE: /home/zammorak/thesis/models/random_search_direction/random_search_results1.csv
+Best val_auc: 0.6090909090909091
+Best val_acc: 0.5634920634920635
+
+FILE: /home/zammorak/thesis/models/test_run/random_search_results.csv
+Best val_auc: 0.5391414141414141
+Best val_acc: 0.5396825396825397
+
+FILE: /home/zammorak/thesis/models/logistic_reduced_t0525_oos_predictions.csv
+Rows: 504
+Mean probability: 0.5012
+
+DATASET
+Rows: 1248
+Columns: 16
+Features:
+ - date
+ - log_return
+ - overnight_return
+ - momentum_5d
+ - momentum_20d
+ - volatility_20d
+ - volume_change
+ - volume_20d_avg
+ - avg_sentiment
+ - spy_return
+ - soxx_return
+ - ief_return
+ - trends_zscore_30d
+ - trends_momentum_7d
+ - target_direction
+ - target_next_return
