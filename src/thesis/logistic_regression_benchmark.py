@@ -27,12 +27,16 @@ python logistic_regression_benchmark.py \
   --outdir /home/zammorak/thesis/models/logistic_regression_benchmark \
   --threshold 0.5
 
-If you want to overwrite/recreate the older thesis output file name:
+If you want to reproduce the older reduced-feature benchmark as closely as possible:
 python logistic_regression_benchmark.py \
   --data /home/zammorak/thesis/data/model_feed/model_dataset_clean.csv \
-  --outdir /home/zammorak/thesis/models \
-  --out_csv /home/zammorak/thesis/models/logistic_reduced_t0525_oos_predictions.csv \
-  --threshold 0.5
+  --outdir /home/zammorak/thesis/models/logistic_regression_benchmark_legacy_t0525 \
+  --out_csv /home/zammorak/thesis/models/logistic_regression_benchmark_legacy_t0525/logistic_reduced_legacy_t0525_oos_predictions.csv \
+  --threshold 0.525 \
+  --drop_features sentiment_std news_count trends_spike \
+  --train_mode train_plus_validation \
+  --no_intercept \
+  --C 1000
 """
 
 from __future__ import annotations
@@ -83,8 +87,11 @@ def best_threshold_youden(y_true: np.ndarray, prob: np.ndarray) -> tuple[float, 
     return best_t, best_j
 
 
-def load_dataset(path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray]:
-    """Load and prepare thesis model dataset."""
+def load_dataset(
+    path: str | Path,
+    drop_features: Optional[Sequence[str]] = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray, list[str]]:
+    """Load and prepare thesis model dataset, optionally dropping named feature columns."""
     df = pd.read_csv(path)
 
     if "date" not in df.columns:
@@ -98,6 +105,14 @@ def load_dataset(path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarr
     df = df[df["date"].notna()].sort_values("date").reset_index(drop=True)
 
     drop_cols = {"date", "target_next_return", "target_direction"}
+    requested_drop_features = list(drop_features or [])
+    available_drop_features = [c for c in requested_drop_features if c in df.columns]
+    missing_drop_features = [c for c in requested_drop_features if c not in df.columns]
+
+    if missing_drop_features:
+        print(f"Warning: requested drop_features not found in dataset: {missing_drop_features}")
+
+    drop_cols.update(available_drop_features)
     feature_cols = [c for c in df.columns if c not in drop_cols]
 
     X_df = df[feature_cols].select_dtypes(include=[np.number]).copy()
@@ -112,7 +127,7 @@ def load_dataset(path: str | Path) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarr
     X = X_df.to_numpy(dtype=float)
     y = df["target_direction"].astype(int).to_numpy()
 
-    return df, X_df, X, y
+    return df, X_df, X, y, available_drop_features
 
 
 def run_walk_forward_logistic(
@@ -130,6 +145,8 @@ def run_walk_forward_logistic(
     class_weight: Optional[str],
     max_iter: int,
     C: float,
+    fit_intercept: bool,
+    train_mode: str,
 ) -> tuple[pd.DataFrame, list[dict]]:
     """
     Expanding-window walk-forward benchmark.
@@ -162,9 +179,24 @@ def run_walk_forward_logistic(
         val_start = train_end - val_size
 
         # Fit scaler on training only. Validation and test are transformed using training-fitted scaler.
+        #
+        # train_mode="strict" follows the clean thesis LSTM-style split:
+        #   train = observations before validation
+        #   validation = last val_size observations before test
+        #
+        # train_mode="train_plus_validation" reproduces the older logistic benchmark style:
+        #   train = all observations before the test window
+        #   validation is still reported separately but is not excluded from fitting.
+        if train_mode == "strict":
+            fit_end = val_start
+        elif train_mode == "train_plus_validation":
+            fit_end = train_end
+        else:
+            raise ValueError("train_mode must be either 'strict' or 'train_plus_validation'.")
+
         scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_all[:val_start])
-        y_train = y_all[:val_start]
+        X_train = scaler.fit_transform(X_all[:fit_end])
+        y_train = y_all[:fit_end]
 
         X_val = scaler.transform(X_all[val_start:train_end])
         y_val = y_all[val_start:train_end]
@@ -177,6 +209,7 @@ def run_walk_forward_logistic(
             C=C,
             solver="lbfgs",
             class_weight=class_weight,
+            fit_intercept=fit_intercept,
             random_state=42,
         )
         model.fit(X_train, y_train)
@@ -218,6 +251,8 @@ def run_walk_forward_logistic(
             "validation_end_date": str(df["date"].iloc[train_end - 1].date()),
             "test_start_date": str(df["date"].iloc[train_end].date()),
             "test_end_date": str(df["date"].iloc[test_end - 1].date()),
+            "train_mode": train_mode,
+            "fit_intercept": bool(fit_intercept),
             "n_train": int(len(y_train)),
             "n_val": int(len(y_val)),
             "n_test": int(len(y_test)),
@@ -301,6 +336,23 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--max_iter", type=int, default=2000)
     parser.add_argument("--C", type=float, default=1.0, help="Inverse regularization strength for LogisticRegression.")
+    parser.add_argument(
+        "--no_intercept",
+        action="store_true",
+        help="Set LogisticRegression(fit_intercept=False). This is useful for reproducing the older reduced logistic benchmark.",
+    )
+    parser.add_argument(
+        "--train_mode",
+        choices=["strict", "train_plus_validation"],
+        default="strict",
+        help="strict excludes validation from fitting; train_plus_validation fits on all pre-test rows, matching the older logistic benchmark style.",
+    )
+    parser.add_argument(
+        "--drop_features",
+        nargs="*",
+        default=[],
+        help="Feature columns to exclude before modelling, e.g. --drop_features sentiment_std news_count trends_spike",
+    )
 
     return parser.parse_args()
 
@@ -316,11 +368,13 @@ def main() -> None:
     out_csv = Path(args.out_csv) if args.out_csv else outdir / "logistic_regression_walkforward_oos_predictions.csv"
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
-    df, X_df, X_all, y_all = load_dataset(args.data)
+    df, X_df, X_all, y_all, dropped_features = load_dataset(args.data, drop_features=args.drop_features)
 
     print("=== LOGISTIC REGRESSION WALK-FORWARD BENCHMARK ===")
     print(f"Data: {args.data}")
     print(f"Rows: {len(df)} | Features: {X_df.shape[1]}")
+    if dropped_features:
+        print(f"Dropped features: {dropped_features}")
     print(f"Date range: {df['date'].iloc[0].date()} -> {df['date'].iloc[-1].date()}")
     print(f"Class balance: up={int(y_all.sum())}, down={int(len(y_all) - y_all.sum())}")
     print(
@@ -328,6 +382,9 @@ def main() -> None:
         f"test_horizon={args.test_horizon}, step={args.step}"
     )
     print(f"Threshold mode: {'Youden validation threshold' if args.auto_threshold else f'fixed {args.threshold}'}")
+    print(f"Train mode: {args.train_mode}")
+    print(f"Fit intercept: {not args.no_intercept}")
+    print(f"C: {args.C}")
     print(f"Class weight: {class_weight}")
 
     oos, folds = run_walk_forward_logistic(
@@ -344,6 +401,8 @@ def main() -> None:
         class_weight=class_weight,
         max_iter=args.max_iter,
         C=args.C,
+        fit_intercept=not args.no_intercept,
+        train_mode=args.train_mode,
     )
 
     summary = {
@@ -360,6 +419,9 @@ def main() -> None:
             "class_weight": class_weight,
             "max_iter": args.max_iter,
             "C": args.C,
+            "fit_intercept": not args.no_intercept,
+            "train_mode": args.train_mode,
+            "drop_features": dropped_features,
             "scaling": "StandardScaler fitted on training window only",
         },
         "feature_columns": X_df.columns.tolist(),
