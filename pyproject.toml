@@ -25,6 +25,7 @@ dependencies = [
   "fastparquet>=2023.4.0",     # optional Parquet engine
   "scipy>=1.11",
   "matplotlib>=3.8",           # scientific figures and thesis-ready plots
+  "jinja2>=3.1",               # required by pandas to_latex/styler output
 ]
 # NOTE: PyTorch is intentionally NOT listed here to avoid accidentally installing the CPU wheel.
 # Install ROCm builds separately:
