@@ -24,6 +24,7 @@ dependencies = [
   "pyarrow>=14.0.0",           # Parquet support
   "fastparquet>=2023.4.0",     # optional Parquet engine
   "scipy>=1.11",
+  "matplotlib>=3.8",           # scientific figures and thesis-ready plots
 ]
 # NOTE: PyTorch is intentionally NOT listed here to avoid accidentally installing the CPU wheel.
 # Install ROCm builds separately:
@@ -49,6 +50,7 @@ dev = [
 
 [project.scripts]
 thesis = "thesis.cli:app"
+thesis-scientific-outputs = "thesis.eval.make_scientific_outputs:main"
 
 [project.urls]
 Homepage = "https://example.com"

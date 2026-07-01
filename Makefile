@@ -1,5 +1,5 @@
 # Common workflows
-.PHONY: install format lint test run
+.PHONY: install format lint test run scientific scientific-test
 
 install:
 	python -m pip install --upgrade pip
@@ -15,4 +15,10 @@ test:
 	pytest
 
 run:
-	python -m thesis.cli greet --name "World"
+	python -m thesis.cli --help
+
+scientific:
+	python -m thesis.eval.make_scientific_outputs
+
+scientific-test:
+	python -m thesis.eval.make_scientific_outputs --run-pytest
