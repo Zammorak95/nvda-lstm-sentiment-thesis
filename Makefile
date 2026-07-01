@@ -1,5 +1,5 @@
 # Common workflows
-.PHONY: install format lint test run scientific scientific-test
+.PHONY: install format lint test run scientific scientific-test baselines baselines-ablations
 
 install:
 	python -m pip install --upgrade pip
@@ -22,3 +22,9 @@ scientific:
 
 scientific-test:
 	python -m thesis.eval.make_scientific_outputs --run-pytest
+
+baselines:
+	python -m thesis.eval.run_baseline_models
+
+baselines-ablations:
+	python -m thesis.eval.run_baseline_models --run-ablations
