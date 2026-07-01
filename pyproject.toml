@@ -52,6 +52,7 @@ dev = [
 [project.scripts]
 thesis = "thesis.cli:app"
 thesis-scientific-outputs = "thesis.eval.make_scientific_outputs:main"
+thesis-baselines = "thesis.eval.run_baseline_models:main"
 
 [project.urls]
 Homepage = "https://example.com"
