@@ -72,6 +72,28 @@ except Exception:
 DEFAULT_DATASET = DATA_DIR / "model_feed" / "model_dataset_clean.csv"
 DEFAULT_RESULTS_DIR = Path(os.getenv("THESIS_MODELS_DIR", MODELS))
 DEFAULT_OUTDIR = ARTIFACTS_DIR / "reports" / "scientific_outputs"
+ROLLING_WINDOW = 20
+
+FEATURE_LABELS = {
+    "avg_sentiment": "Average sentiment",
+    "sentiment_std": "Sentiment std.",
+    "news_count": "News count",
+    "target_next_return": "Next-day return",
+    "target_direction": "Next-day direction",
+    "log_return": "NVDA log return",
+    "overnight_return": "Overnight return",
+    "momentum_5d": "Momentum 5D",
+    "momentum_20d": "Momentum 20D",
+    "volatility_20d": "Volatility 20D",
+    "volume_change": "Volume change",
+    "volume_20d_avg": "Volume 20D average",
+    "spy_return": "SPY return",
+    "soxx_return": "SOXX return",
+    "ief_return": "IEF return",
+    "trends_zscore_30d": "Trends z-score 30D",
+    "trends_momentum_7d": "Trends momentum 7D",
+    "trends_spike": "Trends spike",
+}
 
 
 def configure_matplotlib() -> None:
@@ -105,11 +127,13 @@ def make_output_dirs(outdir: Path) -> OutputPaths:
 
 
 def clean_name(name: str) -> str:
+    if name in FEATURE_LABELS:
+        return FEATURE_LABELS[name]
     return name.replace("_", " ").strip().title()
 
 
 def write_table(df: pd.DataFrame, path_base: Path, float_format: str = "%.4f") -> list[Path]:
-    """Write one table as CSV, Markdown, and LaTeX."""
+    """Write one table as CSV, Markdown, and LaTeX when available."""
     created: list[Path] = []
     csv_path = path_base.with_suffix(".csv")
     md_path = path_base.with_suffix(".md")
@@ -121,8 +145,18 @@ def write_table(df: pd.DataFrame, path_base: Path, float_format: str = "%.4f") -
     md_path.write_text(_to_markdown(df), encoding="utf-8")
     created.append(md_path)
 
-    tex_path.write_text(df.to_latex(index=False, float_format=float_format), encoding="utf-8")
-    created.append(tex_path)
+    try:
+        tex_path.write_text(df.to_latex(index=False, float_format=float_format), encoding="utf-8")
+        created.append(tex_path)
+    except ImportError as exc:
+        warning_path = path_base.with_suffix(".latex_warning.txt")
+        warning_path.write_text(
+            "LaTeX table was skipped because an optional dependency is missing.\n"
+            f"Original error: {exc}\n"
+            "Install with: python -m pip install jinja2\n",
+            encoding="utf-8",
+        )
+        created.append(warning_path)
     return created
 
 
@@ -174,6 +208,14 @@ def numeric_features(df: pd.DataFrame) -> pd.DataFrame:
     return df[cols].select_dtypes(include=[np.number]).copy()
 
 
+def standardize(series: pd.Series) -> pd.Series:
+    series = series.astype(float)
+    std = series.std()
+    if std and np.isfinite(std):
+        return (series - series.mean()) / std
+    return series - series.mean()
+
+
 def generate_dataset_tables(df: pd.DataFrame, outputs: OutputPaths) -> list[Path]:
     created: list[Path] = []
     date_min = df["date"].min().date().isoformat() if "date" in df.columns and df["date"].notna().any() else ""
@@ -192,12 +234,80 @@ def generate_dataset_tables(df: pd.DataFrame, outputs: OutputPaths) -> list[Path
     )
     created += write_table(overview, outputs.tables / "dataset_overview")
 
+    if "target_direction" in df.columns:
+        counts = df["target_direction"].value_counts().reindex([0, 1], fill_value=0)
+        total = int(counts.sum())
+        balance = pd.DataFrame(
+            [
+                {
+                    "class": "Down / flat",
+                    "target_value": 0,
+                    "observations": int(counts.loc[0]),
+                    "share": float(counts.loc[0] / total) if total else np.nan,
+                },
+                {
+                    "class": "Up",
+                    "target_value": 1,
+                    "observations": int(counts.loc[1]),
+                    "share": float(counts.loc[1] / total) if total else np.nan,
+                },
+            ]
+        )
+        created += write_table(balance, outputs.tables / "target_class_balance")
+
+        majority_class = int(counts.idxmax())
+        majority_label = "Up" if majority_class == 1 else "Down / flat"
+        baseline = pd.DataFrame(
+            [
+                {
+                    "baseline": "Majority-class classifier",
+                    "prediction_rule": f"Always predict {majority_label}",
+                    "accuracy": float(counts.max() / total) if total else np.nan,
+                    "auc_reference": 0.5,
+                }
+            ]
+        )
+        created += write_table(baseline, outputs.tables / "classification_baselines")
+
     X = numeric_features(df)
     if not X.empty:
         desc = X.describe().T.reset_index().rename(columns={"index": "feature"})
+        desc["feature"] = desc["feature"].map(clean_name)
         missing = X.isna().sum().rename("missing").reset_index().rename(columns={"index": "feature"})
+        missing["feature"] = missing["feature"].map(clean_name)
         desc = desc.merge(missing, on="feature", how="left")
         created += write_table(desc, outputs.tables / "feature_descriptives")
+
+        if "target_direction" in df.columns:
+            corr_target = X.corrwith(df["target_direction"]).dropna()
+            target_table = (
+                pd.DataFrame(
+                    {
+                        "feature": [clean_name(c) for c in corr_target.index],
+                        "pearson_corr_with_target": corr_target.values,
+                        "abs_corr_with_target": np.abs(corr_target.values),
+                    }
+                )
+                .sort_values("abs_corr_with_target", ascending=False)
+                .reset_index(drop=True)
+            )
+            created += write_table(target_table, outputs.tables / "feature_target_correlations")
+
+        if X.shape[1] >= 2:
+            corr = X.corr().abs()
+            mask = np.triu(np.ones(corr.shape, dtype=bool), k=1)
+            pairs = corr.where(mask).stack().sort_values(ascending=False).head(20)
+            pair_table = pd.DataFrame(
+                [
+                    {
+                        "feature_1": clean_name(idx[0]),
+                        "feature_2": clean_name(idx[1]),
+                        "abs_pearson_corr": float(value),
+                    }
+                    for idx, value in pairs.items()
+                ]
+            )
+            created += write_table(pair_table, outputs.tables / "top_interfeature_correlations")
 
     return created
 
@@ -206,13 +316,28 @@ def generate_target_distribution(df: pd.DataFrame, outputs: OutputPaths) -> Path
     if "target_direction" not in df.columns:
         return None
     counts = df["target_direction"].value_counts().reindex([0, 1], fill_value=0)
-    fig, ax = plt.subplots(figsize=(5.5, 3.8))
-    ax.bar(["Down / flat", "Up"], counts.values)
+    total = counts.sum()
+
+    fig, ax = plt.subplots(figsize=(5.8, 3.8))
+    labels = ["Down / flat", "Up"]
+    bars = ax.bar(labels, counts.values)
     ax.set_title("Target class distribution")
     ax.set_xlabel("Next-day direction")
     ax.set_ylabel("Observations")
-    for idx, value in enumerate(counts.values):
-        ax.text(idx, value, f"{int(value):,}", ha="center", va="bottom")
+    ax.grid(axis="y", alpha=0.25)
+
+    ymax = max(counts.values) if len(counts) else 0
+    ax.set_ylim(0, ymax * 1.18 if ymax else 1)
+    for bar, value in zip(bars, counts.values, strict=False):
+        share = value / total if total else np.nan
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{int(value):,}\n({share:.1%})",
+            ha="center",
+            va="bottom",
+        )
+
     path = outputs.figures / "target_class_distribution.png"
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
@@ -226,19 +351,26 @@ def generate_feature_correlation_heatmap(df: pd.DataFrame, outputs: OutputPaths)
 
     if "target_direction" in df.columns:
         corr_to_target = X.corrwith(df["target_direction"]).abs().sort_values(ascending=False)
-        selected_cols = corr_to_target.head(20).index.tolist()
+        selected_cols = corr_to_target.head(16).index.tolist()
     else:
-        selected_cols = X.columns[:20].tolist()
+        selected_cols = X.columns[:16].tolist()
 
     corr = X[selected_cols].corr()
-    fig_size = max(6.5, 0.38 * len(selected_cols) + 3)
-    fig, ax = plt.subplots(figsize=(fig_size, fig_size * 0.85))
+    labels = [clean_name(c) for c in selected_cols]
+    fig_size = max(7.2, 0.42 * len(selected_cols) + 2.6)
+    fig, ax = plt.subplots(figsize=(fig_size, fig_size * 0.82))
     im = ax.imshow(corr.values, vmin=-1, vmax=1, cmap="coolwarm")
     ax.set_title("Feature correlation heatmap")
     ax.set_xticks(range(len(selected_cols)))
     ax.set_yticks(range(len(selected_cols)))
-    ax.set_xticklabels([clean_name(c) for c in selected_cols], rotation=45, ha="right")
-    ax.set_yticklabels([clean_name(c) for c in selected_cols])
+    ax.set_xticklabels(labels, rotation=45, ha="right")
+    ax.set_yticklabels(labels)
+
+    if len(selected_cols) <= 12:
+        for i in range(len(selected_cols)):
+            for j in range(len(selected_cols)):
+                ax.text(j, i, f"{corr.values[i, j]:.2f}", ha="center", va="center", fontsize=7)
+
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     cbar.set_label("Pearson correlation")
     path = outputs.figures / "feature_correlation_heatmap.png"
@@ -247,39 +379,73 @@ def generate_feature_correlation_heatmap(df: pd.DataFrame, outputs: OutputPaths)
     return path
 
 
-def generate_time_series_overview(df: pd.DataFrame, outputs: OutputPaths) -> Path | None:
-    if "date" not in df.columns:
+def generate_feature_target_correlation_bar(df: pd.DataFrame, outputs: OutputPaths) -> Path | None:
+    if "target_direction" not in df.columns:
         return None
-    preferred = [
-        "target_next_return",
-        "avg_sentiment",
-        "trends_zscore_30d",
-        "momentum_20d",
-        "volatility_20d",
-    ]
-    cols = [c for c in preferred if c in df.columns and pd.api.types.is_numeric_dtype(df[c])]
-    if not cols:
+    X = numeric_features(df)
+    if X.empty:
         return None
 
-    fig, ax = plt.subplots(figsize=(8.5, 4.5))
-    for col in cols[:4]:
-        series = df[col].astype(float)
-        std = series.std()
-        if std and np.isfinite(std):
-            plotted = (series - series.mean()) / std
-            label = f"{clean_name(col)} (z-score)"
-        else:
-            plotted = series
-            label = clean_name(col)
-        ax.plot(df["date"], plotted, linewidth=1.1, label=label)
-    ax.set_title("Time-series overview of selected variables")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Standardized value")
-    ax.legend(loc="best", frameon=False)
-    path = outputs.figures / "time_series_overview.png"
+    corr = X.corrwith(df["target_direction"]).dropna().sort_values(key=lambda s: s.abs(), ascending=False).head(12)
+    if corr.empty:
+        return None
+
+    ordered = corr.iloc[::-1]
+    fig, ax = plt.subplots(figsize=(7.2, 4.8))
+    ax.barh([clean_name(c) for c in ordered.index], ordered.values)
+    ax.axvline(0, linewidth=1)
+    ax.set_title("Feature correlation with next-day direction")
+    ax.set_xlabel("Pearson correlation with target")
+    ax.set_ylabel("Feature")
+    ax.grid(axis="x", alpha=0.25)
+    path = outputs.figures / "feature_target_correlation_bar.png"
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     return path
+
+
+def generate_time_series_figures(df: pd.DataFrame, outputs: OutputPaths) -> list[Path]:
+    if "date" not in df.columns:
+        return []
+
+    groups = {
+        "returns_momentum_rolling_zscore": {
+            "title": "Returns, momentum and volatility",
+            "columns": ["target_next_return", "log_return", "momentum_20d", "volatility_20d"],
+        },
+        "sentiment_news_rolling_zscore": {
+            "title": "Sentiment and news intensity",
+            "columns": ["avg_sentiment", "sentiment_std", "news_count"],
+        },
+        "google_trends_rolling_zscore": {
+            "title": "Google Trends attention variables",
+            "columns": ["trends_zscore_30d", "trends_momentum_7d", "trends_spike"],
+        },
+    }
+
+    created: list[Path] = []
+    for filename, spec in groups.items():
+        cols = [c for c in spec["columns"] if c in df.columns and pd.api.types.is_numeric_dtype(df[c])]
+        if not cols:
+            continue
+
+        fig, ax = plt.subplots(figsize=(8.2, 4.1))
+        for col in cols:
+            plotted = standardize(df[col]).rolling(ROLLING_WINDOW, min_periods=max(5, ROLLING_WINDOW // 4)).mean()
+            ax.plot(df["date"], plotted, linewidth=1.4, label=clean_name(col))
+
+        ax.axhline(0, linewidth=0.8, alpha=0.5)
+        ax.set_title(f"{spec['title']} ({ROLLING_WINDOW}-day rolling z-score)")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Rolling standardized value")
+        ax.grid(axis="y", alpha=0.25)
+        ax.legend(loc="best", frameon=False)
+        path = outputs.figures / f"{filename}.png"
+        fig.savefig(path, bbox_inches="tight")
+        plt.close(fig)
+        created.append(path)
+
+    return created
 
 
 def generate_random_search_outputs(results_dir: Path, outputs: OutputPaths) -> list[Path]:
@@ -297,11 +463,14 @@ def generate_random_search_outputs(results_dir: Path, outputs: OutputPaths) -> l
     if "trial" in rs.columns and "val_auc" in rs.columns:
         fig, ax = plt.subplots(figsize=(7.2, 4.2))
         ax.plot(rs["trial"], rs["val_auc"], marker="o", linewidth=1.2, markersize=3)
-        ax.axhline(rs["val_auc"].max(), linestyle="--", linewidth=1)
+        ax.axhline(rs["val_auc"].max(), linestyle="--", linewidth=1, label="Best validation AUC")
+        ax.axhline(0.5, linestyle=":", linewidth=1, label="Random AUC reference")
         ax.set_title("Random search validation AUC by trial")
         ax.set_xlabel("Trial")
         ax.set_ylabel("Validation AUC")
         ax.set_ylim(max(0.0, rs["val_auc"].min() - 0.05), min(1.0, rs["val_auc"].max() + 0.05))
+        ax.grid(axis="y", alpha=0.25)
+        ax.legend(frameon=False)
         fig_path = outputs.figures / "random_search_validation_auc.png"
         fig.savefig(fig_path, bbox_inches="tight")
         plt.close(fig)
@@ -386,6 +555,7 @@ def generate_walk_forward_outputs(results_dir: Path, outputs: OutputPaths) -> li
         ax.set_xlabel("False positive rate")
         ax.set_ylabel("True positive rate")
         ax.legend(frameon=False)
+        ax.grid(alpha=0.25)
         fig_path = outputs.figures / "walk_forward_roc_curve.png"
         fig.savefig(fig_path, bbox_inches="tight")
         plt.close(fig)
@@ -400,6 +570,7 @@ def generate_walk_forward_outputs(results_dir: Path, outputs: OutputPaths) -> li
         ax.set_xlabel("Date")
         ax.set_ylabel("Probability")
         ax.set_ylim(-0.02, 1.02)
+        ax.grid(axis="y", alpha=0.25)
         ax.legend(frameon=False)
         fig_path = outputs.figures / "walk_forward_predicted_probabilities.png"
         fig.savefig(fig_path, bbox_inches="tight")
@@ -415,6 +586,7 @@ def generate_walk_forward_outputs(results_dir: Path, outputs: OutputPaths) -> li
         ax.set_title("Cumulative out-of-sample return")
         ax.set_xlabel("Date")
         ax.set_ylabel("Cumulative return")
+        ax.grid(axis="y", alpha=0.25)
         ax.legend(frameon=False)
         fig_path = outputs.figures / "walk_forward_cumulative_returns.png"
         fig.savefig(fig_path, bbox_inches="tight")
@@ -516,10 +688,11 @@ def main() -> None:
         for figure in (
             generate_target_distribution(df, outputs),
             generate_feature_correlation_heatmap(df, outputs),
-            generate_time_series_overview(df, outputs),
+            generate_feature_target_correlation_bar(df, outputs),
         ):
             if figure is not None:
                 created.append(figure)
+        created += generate_time_series_figures(df, outputs)
 
     created += generate_random_search_outputs(args.results_dir, outputs)
     created += generate_walk_forward_outputs(args.results_dir, outputs)
