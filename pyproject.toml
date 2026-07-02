@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Sherick Burggraaff" }]
 
-# Core runtime dependencies for preprocessing, evaluation, tables and figures.
+# Core runtime dependencies for data acquisition, preprocessing, evaluation, tables and figures.
 dependencies = [
   "pandas>=2.2",
   "numpy>=1.26",
@@ -48,6 +48,7 @@ dev = [
 
 [project.scripts]
 thesis = "thesis.cli:app"
+thesis-fetch-stockdata = "thesis.data_acquisition.stockdata_api:main"
 thesis-preprocess = "thesis.preprocessing.data_pipeline:main"
 thesis-scientific-outputs = "thesis.eval.make_scientific_outputs:main"
 thesis-baselines = "thesis.eval.run_baseline_models:main"
