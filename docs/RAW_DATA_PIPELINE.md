@@ -6,7 +6,19 @@ The most reliable reproduction path starts from the cleaned modelling dataset:
 data/model_feed/model_dataset_clean.csv
 ```
 
-A full raw-data rebuild is possible in principle, but it depends on external API access, source-data licences and local raw files. Therefore the official thesis reproduction workflow treats `model_dataset_clean.csv` as the minimum reproducibility input.
+A full raw-data rebuild is possible in principle, but it depends on external API access, source-data licences and local raw files. Therefore the official thesis reproduction workflow treats `model_dataset_clean.csv` as the minimum reproducibility input when raw-source access is unavailable.
+
+The canonical preprocessing command is:
+
+```cmd
+thesis-preprocess --help
+```
+
+For the full default preprocessing pipeline:
+
+```cmd
+thesis-preprocess all
+```
 
 ## Conceptual raw-data flow
 
@@ -33,12 +45,41 @@ A full raw-data rebuild is possible in principle, but it depends on external API
    -> data/model_feed/model_dataset_clean.csv
 ```
 
+## Expected raw-data layout
+
+```text
+data/raw/news_headlines/                  Monthly NVDA news CSV files
+data/raw/stock_data/NVDA/                 Raw NVDA EOD CSV
+data/raw/macro_stock_data/SPY/            Raw SPY EOD CSV
+data/raw/macro_stock_data/SOXX/           Raw SOXX EOD CSV
+data/raw/macro_stock_data/IEF/            Raw IEF EOD CSV
+data/raw/trends/                          Google Trends monthly and daily exports
+```
+
+## Main preprocessing outputs
+
+```text
+data/interim/news_headlines_master.csv
+data/processed/news_headlines_clean.csv
+data/processed/news_daily_sentiment.csv
+data/processed/NVDA_eod_processed.csv
+data/processed/SPY_eod_processed.csv
+data/processed/SOXX_eod_processed.csv
+data/processed/IEF_eod_processed.csv
+data/interim/nvidia_trends_daily_consistent.csv
+data/processed/nvidia_trends_processed.csv
+data/model_feed/model_dataset.csv
+data/model_feed/model_dataset_clean.csv
+data/model_feed/model_dataset_audit.xlsx
+```
+
 ## Final model features
 
 The cleaned modelling dataset is expected to contain the target and a curated feature set similar to:
 
 ```text
 target_direction
+target_next_return
 log_return
 overnight_return
 momentum_5d
@@ -57,7 +98,7 @@ trends_momentum_7d
 trends_spike
 ```
 
-`target_next_return` is optional but required for trading-oriented performance metrics such as strategy Sharpe, equity curves and drawdown.
+`target_next_return` is required for trading-oriented performance metrics such as strategy Sharpe, equity curves and drawdown.
 
 ## Why the clean dataset is the reproducibility anchor
 
