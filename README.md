@@ -50,6 +50,13 @@ python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e ".[dev]"
 ```
 
+For a stricter reproducibility-oriented environment, use:
+
+```cmd
+python -m pip install -r requirements-reproducibility.txt
+python -m pip install -e ".[dev]"
+```
+
 TensorFlow is only needed for rerunning LSTM training:
 
 ```cmd
@@ -58,7 +65,7 @@ python -m pip install tensorflow statsmodels tabulate
 
 ### 3A. Acquire raw market/news data and Google Trends exports
 
-Set the StockData.org token locally as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_KEY`. Never commit tokens.
+Set the StockData.org token locally as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_KEY`. Never commit tokens. Use `.env.example` as a template.
 
 Download StockData.org market and news data:
 
@@ -98,7 +105,7 @@ If raw files are unavailable, place the cleaned dataset at:
 data/model_feed/model_dataset_clean.csv
 ```
 
-CSV files in `data/model_feed/` are ignored by Git by default. See [Data policy](docs/DATA.md) for guidance on publishing the clean dataset.
+See [Dataset schema](docs/DATASET_SCHEMA.md) for the expected columns.
 
 ### 4. Generate dataset diagnostics
 
@@ -158,7 +165,9 @@ scripts\reproduce_windows.cmd
 ## Documentation
 
 - [Command reference](docs/COMMANDS.md)
-- [Data policy](docs/DATA.md)
+- [Data files and dataset placement](docs/DATA.md)
+- [Dataset schema](docs/DATASET_SCHEMA.md)
+- [Expected outputs](docs/EXPECTED_OUTPUTS.md)
 - [Raw-data acquisition](docs/DATA_ACQUISITION.md)
 - [Preprocessing pipeline](docs/PREPROCESSING.md)
 - [Raw-data pipeline notes](docs/RAW_DATA_PIPELINE.md)
@@ -186,7 +195,9 @@ thesis-model-comparison --help
 │   └── model_feed/                 # Expected location for model_dataset_clean.csv
 ├── docs/
 │   ├── COMMANDS.md                  # Canonical command reference
-│   ├── DATA.md                      # Dataset and publication policy
+│   ├── DATA.md                      # Dataset placement and local data workflow
+│   ├── DATASET_SCHEMA.md            # Expected clean-dataset columns
+│   ├── EXPECTED_OUTPUTS.md          # Expected files and key thesis metrics
 │   ├── DATA_ACQUISITION.md          # StockData.org and Google Trends collection
 │   ├── PREPROCESSING.md             # Preprocessing stages and commands
 │   ├── RAW_DATA_PIPELINE.md         # Raw-data reconstruction notes
@@ -199,7 +210,10 @@ thesis-model-comparison --help
 │   ├── preprocessing/               # Raw/intermediate-to-clean dataset pipeline
 │   ├── eval/                        # Reporting, baselines, tables and figures
 │   └── model_training/              # LSTM training and walk-forward evaluation
-├── artifacts/                       # Generated outputs, ignored/local
+├── tests/                           # Dataset-independent smoke tests
+├── .github/workflows/               # Lightweight CI smoke test
+├── requirements-reproducibility.txt # Reproducibility-oriented dependency snapshot
+├── .env.example                     # Local environment template
 ├── Makefile
 ├── pyproject.toml
 └── README.md
@@ -224,6 +238,4 @@ The classical benchmark models are deterministic or seeded and should reproduce 
 
 The final reported LSTM result in the thesis should be based on walk-forward out-of-sample predictions, not on random-search validation performance.
 
-## Data publication
-
-The clean modelling dataset can be uploaded to GitHub only if the underlying data licences allow redistribution and the file is small enough for normal Git use. Otherwise, use GitHub Releases, Git LFS, or keep the dataset private and document the required path. See [Data policy](docs/DATA.md).
+The repository now includes a lightweight GitHub Actions smoke test that checks imports and public CLI entry points without requiring the dataset or API token.
