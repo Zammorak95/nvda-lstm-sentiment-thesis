@@ -8,33 +8,31 @@ data/model_feed/model_dataset_clean.csv
 
 A full raw-data rebuild is possible in principle, but it depends on external API access, source-data licences and local raw files. Therefore the official thesis reproduction workflow treats `model_dataset_clean.csv` as the minimum reproducibility input when raw-source access is unavailable.
 
-The canonical preprocessing command is:
+Canonical commands:
 
 ```cmd
+thesis-fetch-stockdata --help
 thesis-preprocess --help
-```
-
-For the full default preprocessing pipeline:
-
-```cmd
-thesis-preprocess all
 ```
 
 ## Conceptual raw-data flow
 
 ```text
-1. Market data
-   StockData.org / market data source
-   -> raw OHLCV files
-   -> processed daily return and volume features
+1. StockData.org market data
+   thesis-fetch-stockdata market
+   -> raw NVDA/SPY/SOXX/IEF OHLCV files
+   -> processed daily return, momentum, volatility and volume features
 
-2. News data
-   raw financial-news headline files
+2. StockData.org news headlines
+   thesis-fetch-stockdata news
+   -> raw financial-news headline files
    -> cleaned and trading-day aligned headline data
    -> VADER sentiment features
 
 3. Google Trends data
-   exported monthly/daily Google Trends files
+   manual Google Trends exports
+   -> full-period monthly anchor export
+   -> shorter daily-window exports
    -> normalized daily attention series
    -> z-score, momentum and spike features
 
@@ -44,6 +42,30 @@ thesis-preprocess all
    -> curated clean feature set
    -> data/model_feed/model_dataset_clean.csv
 ```
+
+## StockData.org raw acquisition
+
+Set a local environment variable first. Never commit the token.
+
+```cmd
+thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
+thesis-fetch-stockdata market --mode eod --symbol SPY  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
+thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
+thesis-fetch-stockdata market --mode eod --symbol IEF  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
+thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
+```
+
+## Google Trends manual acquisition
+
+Google Trends was collected manually. The reproducible description is:
+
+1. Open Google Trends.
+2. Use the same query term and settings as the thesis, for example `Nvidia`, same geography, category and search type.
+3. Download one full-period monthly overview and save it as `data/raw/trends/multiTimeline.csv`.
+4. Download smaller overlapping windows so that Google Trends provides daily resolution. Save them as `multiTimeline(1).csv`, `multiTimeline(2).csv`, etc.
+5. Run `thesis-preprocess trends-reconstruct` and `thesis-preprocess trends-clean`.
+
+The reconstruction step uses the monthly overview as a scale anchor and then rescales the daily chunks into one continuous daily attention series.
 
 ## Expected raw-data layout
 
@@ -116,7 +138,7 @@ For this reason, the codebase is organized so that the empirical results can be 
 
 Use language like:
 
-> The empirical workflow is reproducible from the cleaned modelling dataset, which contains the final synchronized feature matrix used for all model evaluations. Full raw-data reconstruction requires access to the original market, news and Google Trends sources and may therefore depend on data-source availability and licensing.
+> The empirical workflow is reproducible from the cleaned modelling dataset, which contains the final synchronized feature matrix used for all model evaluations. Full raw-data reconstruction requires access to the original market and news API data and manually exported Google Trends files and may therefore depend on data-source availability and licensing.
 
 ## If publishing the clean dataset
 
