@@ -1,36 +1,26 @@
 # Raw-data pipeline notes
 
-The most reliable reproduction path starts from the cleaned modelling dataset:
+The practical review path starts from the cleaned modelling dataset:
 
 ```text
 data/model_feed/model_dataset_clean.csv
 ```
 
-A full raw-data rebuild is possible in principle, but it depends on external API access, source-data licences and local raw files. Therefore the official thesis reproduction workflow treats `model_dataset_clean.csv` as the minimum reproducibility input when raw-source access is unavailable.
-
-Canonical commands:
-
-```cmd
-thesis-fetch-stockdata --help
-thesis-preprocess --help
-```
+A full rebuild is documented for cases where the original downloaded files and Google Trends exports are available.
 
 ## Conceptual raw-data flow
 
 ```text
 1. StockData.org market data
-   thesis-fetch-stockdata market
    -> raw NVDA/SPY/SOXX/IEF OHLCV files
    -> processed daily return, momentum, volatility and volume features
 
 2. StockData.org news headlines
-   thesis-fetch-stockdata news
    -> raw financial-news headline files
    -> cleaned and trading-day aligned headline data
    -> VADER sentiment features
 
 3. Google Trends data
-   manual Google Trends exports
    -> full-period monthly anchor export
    -> shorter daily-window exports
    -> normalized daily attention series
@@ -39,21 +29,18 @@ thesis-preprocess --help
 4. Merge step
    stock features + sentiment features + trends features + macro/ETF features
    -> data/model_feed/model_dataset.csv
-   -> curated clean feature set
    -> data/model_feed/model_dataset_clean.csv
 ```
 
 ## StockData.org raw acquisition
 
-Set a local environment variable first. Never commit the token.
+Use the documented command-line downloader:
 
 ```cmd
-thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
-thesis-fetch-stockdata market --mode eod --symbol SPY  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
-thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
-thesis-fetch-stockdata market --mode eod --symbol IEF  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
-thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
+thesis-fetch-stockdata --help
 ```
+
+The market and news download commands are listed in `docs/DATA_ACQUISITION.md` and `docs/COMMANDS.md`.
 
 ## Google Trends manual acquisition
 
@@ -122,29 +109,11 @@ trends_spike
 
 `target_next_return` is required for trading-oriented performance metrics such as strategy Sharpe, equity curves and drawdown.
 
-## Why the clean dataset is the reproducibility anchor
+## Notes for reviewers
 
-The clean dataset is the best reproducibility anchor because:
+The repository can be reviewed at two levels:
 
-- raw data sources may require API keys;
-- some source data may not be legally redistributable;
-- Google Trends exports can depend on export timing and scaling;
-- raw news files may have licensing restrictions;
-- exact raw downloads may be difficult to recreate later.
+1. Start from `model_dataset_clean.csv` and reproduce the empirical tables and figures.
+2. Start from the downloaded raw files and manual Google Trends exports and rebuild the cleaned dataset with `thesis-preprocess all`.
 
-For this reason, the codebase is organized so that the empirical results can be reproduced from `model_dataset_clean.csv` even when raw-source access is unavailable.
-
-## Recommended reporting language
-
-Use language like:
-
-> The empirical workflow is reproducible from the cleaned modelling dataset, which contains the final synchronized feature matrix used for all model evaluations. Full raw-data reconstruction requires access to the original market and news API data and manually exported Google Trends files and may therefore depend on data-source availability and licensing.
-
-## If publishing the clean dataset
-
-If the clean dataset is legally redistributable and small enough, either:
-
-1. commit it deliberately with `git add -f data/model_feed/model_dataset_clean.csv`, or
-2. publish it as a GitHub Release asset and instruct users to download it into `data/model_feed/`.
-
-Do not accidentally commit raw data, API keys, news full text, or local machine paths.
+The first route is the most convenient for thesis review. The second route documents the full data-construction process.
