@@ -1,9 +1,12 @@
 # Common workflows
-.PHONY: help install format lint test run scientific scientific-test baselines baselines-ablations baselines-linear-svm baselines-linear-svm-ablations lstm-tune lstm-walkforward model-comparison reproduce-lite
+.PHONY: help install format lint test run preprocess preprocess-validate preprocess-audit scientific scientific-test baselines baselines-ablations baselines-linear-svm baselines-linear-svm-ablations lstm-tune lstm-walkforward model-comparison reproduce-lite
 
 help:
 	@echo "Available targets:"
 	@echo "  install                         Install project in editable mode"
+	@echo "  preprocess                      Run the full preprocessing pipeline"
+	@echo "  preprocess-validate             Validate data/model_feed/model_dataset_clean.csv"
+	@echo "  preprocess-audit                Write model_dataset_audit.xlsx"
 	@echo "  scientific                      Generate dataset diagnostics and figures"
 	@echo "  baselines-linear-svm            Run final classical baselines"
 	@echo "  baselines-linear-svm-ablations  Run final baselines with feature ablations"
@@ -28,6 +31,15 @@ test:
 
 run:
 	python -m thesis.cli --help
+
+preprocess:
+	thesis-preprocess all
+
+preprocess-validate:
+	thesis-preprocess validate --input data/model_feed/model_dataset_clean.csv
+
+preprocess-audit:
+	thesis-preprocess audit --input data/model_feed/model_dataset_clean.csv --output data/model_feed/model_dataset_audit.xlsx
 
 scientific:
 	python -m thesis.eval.make_scientific_outputs
