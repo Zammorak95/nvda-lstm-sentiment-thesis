@@ -6,7 +6,8 @@ walk-forward result and exports:
 - CSV table
 - Markdown table
 - LaTeX table
-- PNG image of the table
+- compact PNG table
+- separate classification and trading PNG tables
 - AUC bar chart
 
 Typical command:
@@ -28,8 +29,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
+from textwrap import fill
 from typing import Any
 
 import matplotlib
@@ -74,9 +75,26 @@ OUTPUT_COLUMNS = [
     "Max drawdown",
 ]
 
+COMPACT_HEADERS = {
+    "Model": "Model",
+    "Role": "Role",
+    "OOS AUC": "OOS\nAUC",
+    "OOS accuracy": "OOS\nAcc.",
+    "Balanced accuracy": "Bal.\nAcc.",
+    "Strategy Sharpe": "Strategy\nSharpe",
+    "Trade rate": "Trade\nRate",
+    "Max drawdown": "Max\nDD",
+}
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_BASELINE = PROJECT_ROOT / "artifacts" / "reports" / "baseline_models_linear_svm_ablations" / "tables" / "baseline_model_metrics.csv"
+DEFAULT_BASELINE = (
+    PROJECT_ROOT
+    / "artifacts"
+    / "reports"
+    / "baseline_models_linear_svm_ablations"
+    / "tables"
+    / "baseline_model_metrics.csv"
+)
 DEFAULT_OUTDIR = PROJECT_ROOT / "artifacts" / "reports" / "model_comparison"
 
 
@@ -107,22 +125,45 @@ def parse_lstm_metrics(args: argparse.Namespace) -> dict[str, float | None]:
     if summary_path is None:
         summary_path = first_existing(
             [
-                PROJECT_ROOT / "artifacts" / "models" / "walk_forward_direction_bestparams" / "walk_forward_summary_best_features.json",
-                PROJECT_ROOT / "artifacts" / "models" / "walk_forward_direction_bestparams" / "walk_forward_summary.json",
-                PROJECT_ROOT / "models" / "walk_forward_direction_bestparams" / "walk_forward_summary_best_features.json",
-                PROJECT_ROOT / "models" / "walk_forward_direction_bestparams" / "walk_forward_summary.json",
+                PROJECT_ROOT
+                / "artifacts"
+                / "models"
+                / "walk_forward_direction_bestparams"
+                / "walk_forward_summary_best_features.json",
+                PROJECT_ROOT
+                / "artifacts"
+                / "models"
+                / "walk_forward_direction_bestparams"
+                / "walk_forward_summary.json",
+                PROJECT_ROOT
+                / "models"
+                / "walk_forward_direction_bestparams"
+                / "walk_forward_summary_best_features.json",
+                PROJECT_ROOT
+                / "models"
+                / "walk_forward_direction_bestparams"
+                / "walk_forward_summary.json",
             ]
         )
 
     if summary_path is not None and summary_path.exists():
         summary = read_json(summary_path)
-        # Accept several naming variants because older thesis runs used slightly
-        # different JSON keys.
         key_map = {
             "auc": ["overall_oos_auc", "overall_auc", "oos_auc", "auc"],
-            "accuracy": ["overall_oos_acc", "overall_oos_accuracy", "overall_acc", "oos_acc", "accuracy"],
+            "accuracy": [
+                "overall_oos_acc",
+                "overall_oos_accuracy",
+                "overall_acc",
+                "oos_acc",
+                "accuracy",
+            ],
             "balanced_accuracy": ["balanced_accuracy", "overall_balanced_accuracy"],
-            "strategy_sharpe": ["strategy_sharpe", "oos_sharpe_long_only", "sharpe", "sharpe_long_only"],
+            "strategy_sharpe": [
+                "strategy_sharpe",
+                "oos_sharpe_long_only",
+                "sharpe",
+                "sharpe_long_only",
+            ],
             "trade_rate": ["trade_rate", "oos_trade_rate"],
             "max_drawdown": ["max_drawdown", "strategy_max_drawdown"],
         }
@@ -137,7 +178,6 @@ def parse_lstm_metrics(args: argparse.Namespace) -> dict[str, float | None]:
                     except (TypeError, ValueError):
                         continue
 
-        # Some summaries nest strategy metrics.
         strategy = summary.get("strategy") or summary.get("strategy_metrics") or {}
         if isinstance(strategy, dict):
             if values["strategy_sharpe"] is None:
@@ -226,10 +266,32 @@ def build_comparison_table(baselines: pd.DataFrame, lstm: dict[str, float | None
 
 def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
     display = df.copy()
-    for col in ["OOS AUC", "OOS accuracy", "Balanced accuracy", "Strategy Sharpe", "Trade rate", "Max drawdown"]:
+    for col in [
+        "OOS AUC",
+        "OOS accuracy",
+        "Balanced accuracy",
+        "Strategy Sharpe",
+        "Trade rate",
+        "Max drawdown",
+    ]:
         if col in display.columns:
             display[col] = display[col].apply(lambda x: "—" if pd.isna(x) else f"{float(x):.4f}")
     return display
+
+
+def wrap_text_columns(display: pd.DataFrame) -> pd.DataFrame:
+    wrapped = display.copy()
+    if "Model" in wrapped.columns:
+        wrapped["Model"] = wrapped["Model"].replace(
+            {"LSTM (best specification)": "LSTM\n(best spec.)"}
+        )
+    if "Role" in wrapped.columns:
+        wrapped["Role"] = wrapped["Role"].apply(lambda x: fill(str(x), width=18))
+    return wrapped
+
+
+def compact_headers(display: pd.DataFrame) -> pd.DataFrame:
+    return display.rename(columns=COMPACT_HEADERS)
 
 
 def write_outputs(df: pd.DataFrame, outdir: Path) -> None:
@@ -250,14 +312,59 @@ def write_outputs(df: pd.DataFrame, outdir: Path) -> None:
     except Exception as exc:
         (outdir / "model_comparison_table_latex_warning.txt").write_text(str(exc), encoding="utf-8")
 
-    make_table_png(display, outdir / "model_comparison_table.png")
+    compact = compact_headers(wrap_text_columns(display))
+    make_table_png(
+        compact,
+        outdir / "model_comparison_table.png",
+        title="Out-of-sample model comparison under walk-forward validation",
+        widths=[0.18, 0.20, 0.09, 0.09, 0.10, 0.11, 0.09, 0.09],
+        fig_width=11.2,
+        fig_height=3.4,
+        fontsize=8.5,
+        header_fontsize=8.8,
+    )
+
+    classification = compact_headers(
+        wrap_text_columns(display[["Model", "Role", "OOS AUC", "OOS accuracy", "Balanced accuracy"]])
+    )
+    make_table_png(
+        classification,
+        outdir / "model_comparison_classification_table.png",
+        title="Classification performance under walk-forward validation",
+        widths=[0.24, 0.28, 0.14, 0.14, 0.14],
+        fig_width=8.8,
+        fig_height=3.2,
+        fontsize=9.0,
+        header_fontsize=9.2,
+    )
+
+    trading = compact_headers(
+        wrap_text_columns(display[["Model", "Strategy Sharpe", "Trade rate", "Max drawdown"]])
+    )
+    make_table_png(
+        trading,
+        outdir / "model_comparison_trading_table.png",
+        title="Trading-oriented performance metrics",
+        widths=[0.34, 0.19, 0.18, 0.18],
+        fig_width=7.4,
+        fig_height=3.0,
+        fontsize=9.0,
+        header_fontsize=9.2,
+    )
+
     make_auc_plot(df, outdir / "model_comparison_auc.png")
 
 
-def make_table_png(display: pd.DataFrame, path: Path) -> None:
-    n_rows, n_cols = display.shape
-    fig_width = 12.0
-    fig_height = max(2.8, 0.55 * n_rows + 1.25)
+def make_table_png(
+    display: pd.DataFrame,
+    path: Path,
+    title: str,
+    widths: list[float],
+    fig_width: float,
+    fig_height: float,
+    fontsize: float,
+    header_fontsize: float,
+) -> None:
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     ax.axis("off")
 
@@ -267,49 +374,36 @@ def make_table_png(display: pd.DataFrame, path: Path) -> None:
         cellLoc="center",
         colLoc="center",
         loc="center",
+        bbox=[0.02, 0.03, 0.96, 0.80],
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(9)
-    table.scale(1.0, 1.35)
+    table.set_fontsize(fontsize)
 
-    # Column widths tuned for thesis-style output.
-    widths = {
-        0: 0.18,
-        1: 0.23,
-        2: 0.09,
-        3: 0.10,
-        4: 0.11,
-        5: 0.11,
-        6: 0.08,
-        7: 0.10,
-    }
     for (row, col), cell in table.get_celld().items():
-        cell.set_edgecolor("0.85")
-        cell.set_linewidth(0.6)
-        if col in widths:
+        cell.set_edgecolor("0.82")
+        cell.set_linewidth(0.55)
+        if col < len(widths):
             cell.set_width(widths[col])
         if row == 0:
-            cell.set_text_props(weight="bold")
-            cell.set_facecolor("0.92")
+            cell.set_text_props(weight="bold", fontsize=header_fontsize)
+            cell.set_facecolor("0.90")
         elif row % 2 == 0:
             cell.set_facecolor("0.97")
+        else:
+            cell.set_facecolor("1.00")
         if col in [0, 1] and row > 0:
             cell.get_text().set_ha("left")
 
-    ax.set_title(
-        "Out-of-sample model comparison under walk-forward validation",
-        fontsize=13,
-        weight="bold",
-        pad=16,
-    )
+    ax.set_title(title, fontsize=11.5, weight="bold", pad=8)
     fig.savefig(path, bbox_inches="tight", dpi=300)
     plt.close(fig)
 
 
 def make_auc_plot(df: pd.DataFrame, path: Path) -> None:
     plot_df = df[["Model", "OOS AUC"]].copy()
+    plot_df["Model"] = plot_df["Model"].replace({"LSTM (best specification)": "LSTM"})
     plot_df["OOS AUC"] = pd.to_numeric(plot_df["OOS AUC"], errors="coerce")
-    fig, ax = plt.subplots(figsize=(8.0, 4.2))
+    fig, ax = plt.subplots(figsize=(7.4, 4.0))
     ax.bar(plot_df["Model"], plot_df["OOS AUC"])
     ax.axhline(0.5, linestyle="--", linewidth=1, label="Random AUC")
     ax.set_title("Out-of-sample AUC comparison")
@@ -317,7 +411,7 @@ def make_auc_plot(df: pd.DataFrame, path: Path) -> None:
     ax.set_ylabel("OOS AUC")
     ax.set_ylim(0.45, max(0.58, float(plot_df["OOS AUC"].max()) + 0.02))
     ax.grid(axis="y", alpha=0.25)
-    ax.tick_params(axis="x", rotation=25)
+    ax.tick_params(axis="x", rotation=20)
     ax.legend(frameon=False)
     fig.savefig(path, bbox_inches="tight", dpi=300)
     plt.close(fig)
@@ -348,6 +442,8 @@ def main() -> None:
     print("Model comparison table complete.")
     print("CSV :", args.outdir / "model_comparison_table.csv")
     print("PNG :", args.outdir / "model_comparison_table.png")
+    print("CLS :", args.outdir / "model_comparison_classification_table.png")
+    print("TRD :", args.outdir / "model_comparison_trading_table.png")
     print("AUC :", args.outdir / "model_comparison_auc.png")
 
 
