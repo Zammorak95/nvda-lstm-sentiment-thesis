@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Sherick Burggraaff" }]
 
-# Core runtime dependencies for data preparation, evaluation, tables and figures.
+# Core runtime dependencies for preprocessing, evaluation, tables and figures.
 dependencies = [
   "pandas>=2.2",
   "numpy>=1.26",
@@ -26,6 +26,8 @@ dependencies = [
   "scipy>=1.11",
   "matplotlib>=3.8",
   "jinja2>=3.1",
+  "nltk>=3.8",
+  "xlsxwriter>=3.2",
 ]
 # TensorFlow is intentionally not listed as a hard dependency because installation
 # differs by OS and hardware. Install it separately when reproducing the LSTM runs:
@@ -46,6 +48,7 @@ dev = [
 
 [project.scripts]
 thesis = "thesis.cli:app"
+thesis-preprocess = "thesis.preprocessing.data_pipeline:main"
 thesis-scientific-outputs = "thesis.eval.make_scientific_outputs:main"
 thesis-baselines = "thesis.eval.run_baseline_models:main"
 thesis-baselines-linear-svm = "thesis.eval.run_baseline_models_linear_svm:main"
