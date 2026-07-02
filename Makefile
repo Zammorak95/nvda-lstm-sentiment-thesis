@@ -1,9 +1,12 @@
 # Common workflows
-.PHONY: help install format lint test run preprocess preprocess-validate preprocess-audit scientific scientific-test baselines baselines-ablations baselines-linear-svm baselines-linear-svm-ablations lstm-tune lstm-walkforward model-comparison reproduce-lite
+.PHONY: help install format lint test run fetch-nvda fetch-macro fetch-news preprocess preprocess-validate preprocess-audit scientific scientific-test baselines baselines-ablations baselines-linear-svm baselines-linear-svm-ablations lstm-tune lstm-walkforward model-comparison reproduce-lite
 
 help:
 	@echo "Available targets:"
 	@echo "  install                         Install project in editable mode"
+	@echo "  fetch-nvda                      Fetch NVDA EOD data from StockData.org"
+	@echo "  fetch-macro                     Fetch SPY/SOXX/IEF EOD data from StockData.org"
+	@echo "  fetch-news                      Fetch NVDA news headlines from StockData.org"
 	@echo "  preprocess                      Run the full preprocessing pipeline"
 	@echo "  preprocess-validate             Validate data/model_feed/model_dataset_clean.csv"
 	@echo "  preprocess-audit                Write model_dataset_audit.xlsx"
@@ -31,6 +34,17 @@ test:
 
 run:
 	python -m thesis.cli --help
+
+fetch-nvda:
+	thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
+
+fetch-macro:
+	thesis-fetch-stockdata market --mode eod --symbol SPY --start 2019-03-01 --end 2026-03-01 --csv --outdir data/raw/macro_stock_data/SPY
+	thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data/raw/macro_stock_data/SOXX
+	thesis-fetch-stockdata market --mode eod --symbol IEF --start 2019-03-01 --end 2026-03-01 --csv --outdir data/raw/macro_stock_data/IEF
+
+fetch-news:
+	thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
 
 preprocess:
 	thesis-preprocess all
