@@ -2,7 +2,7 @@
 
 This repository contains the code used for a Master's thesis on forecasting NVIDIA (NVDA) next-day stock-price direction using LSTM models, market variables, news sentiment, Google Trends attention variables and classical machine-learning benchmarks.
 
-The repository is structured to make the empirical workflow reproducible: from the cleaned modelling dataset to dataset diagnostics, benchmark models, LSTM walk-forward evaluation and final thesis-ready tables/figures.
+The repository is structured to make the empirical workflow reproducible: from raw/intermediate data preprocessing to the cleaned modelling dataset, dataset diagnostics, benchmark models, LSTM walk-forward evaluation and final thesis-ready tables/figures.
 
 ## Research workflow
 
@@ -22,6 +22,12 @@ The most important reproducibility input is:
 
 ```text
 data/model_feed/model_dataset_clean.csv
+```
+
+The canonical preprocessing entry point is:
+
+```cmd
+thesis-preprocess --help
 ```
 
 ## Quickstart: reproduce the main tables and figures
@@ -60,9 +66,27 @@ TensorFlow is only needed for rerunning LSTM training:
 python -m pip install tensorflow statsmodels tabulate
 ```
 
-### 3. Add the cleaned dataset
+### 3A. Build the cleaned dataset from raw/intermediate files
 
-Place the cleaned dataset at:
+If the raw files are available in the expected `data/raw/` layout, run:
+
+```cmd
+thesis-preprocess all
+```
+
+This creates:
+
+```text
+data/model_feed/model_dataset.csv
+data/model_feed/model_dataset_clean.csv
+data/model_feed/model_dataset_audit.xlsx
+```
+
+See [Preprocessing pipeline](docs/PREPROCESSING.md) for the individual stages.
+
+### 3B. Or add the cleaned dataset directly
+
+If raw files are unavailable, place the cleaned dataset at:
 
 ```text
 data/model_feed/model_dataset_clean.csv
@@ -169,6 +193,7 @@ This creates the virtual environment if needed, installs the project, runs datas
 
 - [Command reference](docs/COMMANDS.md)
 - [Data policy](docs/DATA.md)
+- [Preprocessing pipeline](docs/PREPROCESSING.md)
 - [Raw-data pipeline notes](docs/RAW_DATA_PIPELINE.md)
 - [Reproducibility guide](docs/REPRODUCIBILITY.md)
 - [Script index](docs/SCRIPT_INDEX.md)
@@ -176,6 +201,8 @@ This creates the virtual environment if needed, installs the project, runs datas
 Common commands:
 
 ```cmd
+thesis-preprocess --help
+thesis-preprocess all
 python -m thesis.eval.make_scientific_outputs
 python -m thesis.eval.run_baseline_models_linear_svm --run-ablations
 thesis-tune-lstm --trials 50 --auto_threshold
@@ -192,12 +219,14 @@ thesis-model-comparison --help
 ├── docs/
 │   ├── COMMANDS.md                  # Canonical command reference
 │   ├── DATA.md                      # Dataset and publication policy
+│   ├── PREPROCESSING.md             # Preprocessing stages and commands
 │   ├── RAW_DATA_PIPELINE.md         # Raw-data reconstruction notes
 │   ├── REPRODUCIBILITY.md           # End-to-end reproduction guide
 │   └── SCRIPT_INDEX.md              # Active scripts and naming conventions
 ├── scripts/
 │   └── reproduce_windows.cmd        # Windows reproduction helper
 ├── src/thesis/
+│   ├── preprocessing/               # Raw/intermediate-to-clean dataset pipeline
 │   ├── eval/                        # Reporting, baselines, tables and figures
 │   └── model_training/              # LSTM training and walk-forward evaluation
 ├── artifacts/                       # Generated outputs, ignored/local
@@ -214,6 +243,7 @@ Main active commands:
 
 | Purpose | Command |
 |---|---|
+| Full preprocessing pipeline | `thesis-preprocess all` |
 | Dataset diagnostics | `python -m thesis.eval.make_scientific_outputs` |
 | Classical baselines | `python -m thesis.eval.run_baseline_models_linear_svm` |
 | Feature ablation | `python -m thesis.eval.run_baseline_models_linear_svm --run-ablations` |
