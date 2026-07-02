@@ -1,5 +1,5 @@
 # Common workflows
-.PHONY: install format lint test run scientific scientific-test baselines baselines-ablations baselines-linear-svm baselines-linear-svm-ablations
+.PHONY: install format lint test run scientific scientific-test baselines baselines-ablations baselines-linear-svm baselines-linear-svm-ablations model-comparison
 
 install:
 	python -m pip install --upgrade pip
@@ -34,3 +34,6 @@ baselines-linear-svm:
 
 baselines-linear-svm-ablations:
 	python -m thesis.eval.run_baseline_models_linear_svm --run-ablations
+
+model-comparison:
+	python -m thesis.eval.make_model_comparison_table
