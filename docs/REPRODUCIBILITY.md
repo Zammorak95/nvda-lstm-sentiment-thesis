@@ -4,11 +4,12 @@ This guide describes how to reproduce the thesis workflow from a clean clone to 
 
 ## Scope
 
-The reproducible workflow has three levels:
+The reproducible workflow has four levels:
 
 1. **Report-level reproduction**: recreate tables and figures from `data/model_feed/model_dataset_clean.csv`.
 2. **Model-level reproduction**: rerun baselines and LSTM walk-forward validation from the cleaned dataset.
-3. **Full raw-data reproduction**: rerun preprocessing from the original raw source files into `model_dataset_clean.csv`.
+3. **Preprocessing-level reproduction**: rebuild `model_dataset_clean.csv` from existing raw/intermediate files.
+4. **Raw-data acquisition reproduction**: fetch market/news data through StockData.org and manually export Google Trends files.
 
 The most reliable and practical route is level 1 or 2. Exact retraining of the LSTM can vary slightly because neural-network training is stochastic and can differ across CPU/GPU, TensorFlow version and operating system.
 
@@ -26,15 +27,6 @@ Expected clean input for report/model reproduction:
 data/model_feed/model_dataset_clean.csv
 ```
 
-Expected generated outputs:
-
-```text
-artifacts/reports/scientific_outputs/
-artifacts/reports/baseline_models_linear_svm_ablations/
-artifacts/models/walk_forward_direction_bestparams_reproduction/
-artifacts/reports/model_comparison/
-```
-
 ## Step 1 — Create environment
 
 Windows CMD:
@@ -49,7 +41,21 @@ python -m pip install tensorflow statsmodels tabulate
 
 For non-LSTM report reproduction, TensorFlow is not required. It is only needed for LSTM random search and walk-forward training.
 
-## Step 2A — Reproduce from raw/intermediate data
+## Step 2A — Acquire raw StockData.org data and Google Trends files
+
+Set a local StockData.org token as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_KEY`. Do not commit the token.
+
+```cmd
+thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
+thesis-fetch-stockdata market --mode eod --symbol SPY --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
+thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
+thesis-fetch-stockdata market --mode eod --symbol IEF --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
+thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
+```
+
+Google Trends files were downloaded manually from the Google Trends website: one full-period monthly overview plus shorter daily-window exports. Save those files in `data/raw/trends/`. See `docs/DATA_ACQUISITION.md` for the process.
+
+## Step 2B — Reproduce from raw/intermediate data
 
 If the raw files are available in the expected layout, run:
 
@@ -74,15 +80,16 @@ data/model_feed/model_dataset_clean.csv
 data/model_feed/model_dataset_audit.xlsx
 ```
 
-Use this command to inspect preprocessing subcommands:
+Use these commands to inspect the acquisition and preprocessing subcommands:
 
 ```cmd
+thesis-fetch-stockdata --help
 thesis-preprocess --help
 ```
 
-See `docs/PREPROCESSING.md` for a stage-by-stage explanation.
+See `docs/DATA_ACQUISITION.md` and `docs/PREPROCESSING.md` for stage-by-stage explanations.
 
-## Step 2B — Reproduce from the cleaned dataset
+## Step 2C — Reproduce from the cleaned dataset
 
 If raw files are unavailable, place the cleaned dataset here:
 
@@ -110,14 +117,7 @@ python -m thesis.eval.run_baseline_models_linear_svm ^
   --outdir artifacts\reports\baseline_models_linear_svm_ablations
 ```
 
-This evaluates:
-
-- Majority-class benchmark
-- Logistic regression
-- Linear SVM
-- Random Forest
-
-It also generates feature-set ablations for market, macro, sentiment and attention features.
+This evaluates majority class, logistic regression, linear SVM and Random Forest, including feature-set ablations.
 
 ## Step 5 — Reproduce the final LSTM walk-forward specification
 
@@ -140,11 +140,7 @@ thesis-walkforward-lstm ^
   --auto_threshold
 ```
 
-On Linux/ROCm, add:
-
-```bash
---gpu 0
-```
+On Linux/ROCm, add `--gpu 0`.
 
 The historical thesis best run achieved an OOS AUC of approximately `0.5506`. A fresh retraining run may not match exactly because TensorFlow/LSTM training is stochastic.
 
@@ -158,8 +154,6 @@ python src\thesis\eval\thesis_walkforward_report.py ^
   --cost_bps 5
 ```
 
-This creates LSTM-oriented figures and statistical checks, including calibration, equity/drawdown and fold-level metrics.
-
 ## Step 7 — Generate combined comparison table
 
 Use the historical final LSTM values when reproducing the exact table from the thesis:
@@ -172,15 +166,6 @@ thesis-model-comparison ^
   --lstm-sharpe 0.9957887190041333 ^
   --lstm-trade-rate 0.5396825396825397 ^
   --outdir artifacts\reports\model_comparison
-```
-
-If you want to use a fresh LSTM reproduction instead, pass the metrics from the new summary file or use:
-
-```cmd
-thesis-model-comparison ^
-  --baseline-metrics artifacts\reports\baseline_models_linear_svm_ablations\tables\baseline_model_metrics.csv ^
-  --lstm-summary artifacts\models\walk_forward_direction_bestparams_reproduction\walk_forward_summary.json ^
-  --outdir artifacts\reports\model_comparison_reproduced
 ```
 
 ## Final output files to inspect
@@ -197,7 +182,9 @@ artifacts/reports/model_comparison/
 
 ## Reproducibility caveats
 
-- Raw-data reproduction requires access to the original raw CSV/API exports and their licences.
+- Raw-data reproduction requires a StockData.org token, the correct subscription access, manually exported Google Trends files and respect for data licences.
+- Raw news and market data may not be legally redistributable.
+- Google Trends exports can depend on query settings, geography, category, time window and export timing.
 - Random Forest results are seeded and should be stable.
 - Logistic regression and linear SVM should be stable given the same data and package versions.
 - LSTM training can vary across repeated runs.
