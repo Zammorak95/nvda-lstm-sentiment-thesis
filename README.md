@@ -2,14 +2,12 @@
 
 This repository contains the code used for a Master's thesis on forecasting NVIDIA (NVDA) next-day stock-price direction using LSTM models, market variables, news sentiment, Google Trends attention variables and classical machine-learning benchmarks.
 
-The repository is structured to make the empirical workflow reproducible: from raw/intermediate data preprocessing to the cleaned modelling dataset, dataset diagnostics, benchmark models, LSTM walk-forward evaluation and final thesis-ready tables/figures.
+The repository is structured to make the empirical workflow reproducible: from raw-data acquisition and preprocessing to the cleaned modelling dataset, dataset diagnostics, benchmark models, LSTM walk-forward evaluation and final thesis-ready tables/figures.
 
 ## Research workflow
 
-The empirical workflow is:
-
 ```text
-Raw sources
+StockData.org market/news downloads + manual Google Trends exports
   -> preprocessing and feature engineering
   -> data/model_feed/model_dataset_clean.csv
   -> dataset diagnostics and feature assessment
@@ -24,9 +22,10 @@ The most important reproducibility input is:
 data/model_feed/model_dataset_clean.csv
 ```
 
-The canonical preprocessing entry point is:
+Canonical raw-data and preprocessing entry points:
 
 ```cmd
+thesis-fetch-stockdata --help
 thesis-preprocess --help
 ```
 
@@ -51,22 +50,29 @@ python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e ".[dev]"
 ```
 
-macOS / Linux:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -e ".[dev]"
-```
-
 TensorFlow is only needed for rerunning LSTM training:
 
 ```cmd
 python -m pip install tensorflow statsmodels tabulate
 ```
 
-### 3A. Build the cleaned dataset from raw/intermediate files
+### 3A. Acquire raw market/news data and Google Trends exports
+
+Set the StockData.org token locally as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_KEY`. Never commit tokens.
+
+Download StockData.org market and news data:
+
+```cmd
+thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
+thesis-fetch-stockdata market --mode eod --symbol SPY  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
+thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
+thesis-fetch-stockdata market --mode eod --symbol IEF  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
+thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
+```
+
+Google Trends was downloaded manually: one full-period monthly export plus smaller daily-window exports. Save these in `data/raw/trends/`. See [Raw-data acquisition](docs/DATA_ACQUISITION.md).
+
+### 3B. Build the cleaned dataset from raw/intermediate files
 
 If the raw files are available in the expected `data/raw/` layout, run:
 
@@ -84,7 +90,7 @@ data/model_feed/model_dataset_audit.xlsx
 
 See [Preprocessing pipeline](docs/PREPROCESSING.md) for the individual stages.
 
-### 3B. Or add the cleaned dataset directly
+### 3C. Or add the cleaned dataset directly
 
 If raw files are unavailable, place the cleaned dataset at:
 
@@ -100,31 +106,12 @@ CSV files in `data/model_feed/` are ignored by Git by default. See [Data policy]
 python -m thesis.eval.make_scientific_outputs
 ```
 
-Output:
-
-```text
-artifacts/reports/scientific_outputs/
-```
-
 ### 5. Run classical baselines with linear SVM
 
 ```cmd
 python -m thesis.eval.run_baseline_models_linear_svm ^
   --run-ablations ^
   --outdir artifacts\reports\baseline_models_linear_svm_ablations
-```
-
-This evaluates:
-
-- Majority-class benchmark
-- Logistic regression
-- Linear SVM
-- Random Forest
-
-Output:
-
-```text
-artifacts/reports/baseline_models_linear_svm_ablations/
 ```
 
 ### 6. Reproduce the final LSTM walk-forward specification
@@ -148,11 +135,7 @@ thesis-walkforward-lstm ^
   --auto_threshold
 ```
 
-On Linux/ROCm, add `--gpu 0` if the ROCm GPU environment is configured.
-
 ### 7. Generate combined LSTM + benchmark comparison tables
-
-To reproduce the thesis table using the historical final LSTM metrics:
 
 ```cmd
 thesis-model-comparison ^
@@ -164,21 +147,6 @@ thesis-model-comparison ^
   --outdir artifacts\reports\model_comparison
 ```
 
-Output:
-
-```text
-artifacts/reports/model_comparison/
-```
-
-The most useful thesis files are:
-
-```text
-model_comparison_classification_table.png
-model_comparison_trading_table.png
-model_comparison_auc.png
-model_comparison_table.csv
-```
-
 ## One-command Windows reproduction
 
 After placing `data/model_feed/model_dataset_clean.csv`, run:
@@ -187,12 +155,11 @@ After placing `data/model_feed/model_dataset_clean.csv`, run:
 scripts\reproduce_windows.cmd
 ```
 
-This creates the virtual environment if needed, installs the project, runs dataset diagnostics, runs the linear-SVM baseline ablation, and generates the combined model-comparison table using the historical final LSTM metrics.
-
 ## Documentation
 
 - [Command reference](docs/COMMANDS.md)
 - [Data policy](docs/DATA.md)
+- [Raw-data acquisition](docs/DATA_ACQUISITION.md)
 - [Preprocessing pipeline](docs/PREPROCESSING.md)
 - [Raw-data pipeline notes](docs/RAW_DATA_PIPELINE.md)
 - [Reproducibility guide](docs/REPRODUCIBILITY.md)
@@ -201,6 +168,7 @@ This creates the virtual environment if needed, installs the project, runs datas
 Common commands:
 
 ```cmd
+thesis-fetch-stockdata --help
 thesis-preprocess --help
 thesis-preprocess all
 python -m thesis.eval.make_scientific_outputs
@@ -219,6 +187,7 @@ thesis-model-comparison --help
 ├── docs/
 │   ├── COMMANDS.md                  # Canonical command reference
 │   ├── DATA.md                      # Dataset and publication policy
+│   ├── DATA_ACQUISITION.md          # StockData.org and Google Trends collection
 │   ├── PREPROCESSING.md             # Preprocessing stages and commands
 │   ├── RAW_DATA_PIPELINE.md         # Raw-data reconstruction notes
 │   ├── REPRODUCIBILITY.md           # End-to-end reproduction guide
@@ -226,6 +195,7 @@ thesis-model-comparison --help
 ├── scripts/
 │   └── reproduce_windows.cmd        # Windows reproduction helper
 ├── src/thesis/
+│   ├── data_acquisition/            # StockData.org raw market/news downloads
 │   ├── preprocessing/               # Raw/intermediate-to-clean dataset pipeline
 │   ├── eval/                        # Reporting, baselines, tables and figures
 │   └── model_training/              # LSTM training and walk-forward evaluation
@@ -237,12 +207,9 @@ thesis-model-comparison --help
 
 ## Active scripts
 
-The preferred entry points are documented in [Script index](docs/SCRIPT_INDEX.md).
-
-Main active commands:
-
 | Purpose | Command |
 |---|---|
+| StockData.org downloads | `thesis-fetch-stockdata` |
 | Full preprocessing pipeline | `thesis-preprocess all` |
 | Dataset diagnostics | `python -m thesis.eval.make_scientific_outputs` |
 | Classical baselines | `python -m thesis.eval.run_baseline_models_linear_svm` |
@@ -250,8 +217,6 @@ Main active commands:
 | LSTM tuning | `thesis-tune-lstm` |
 | LSTM walk-forward evaluation | `thesis-walkforward-lstm` |
 | Combined comparison table | `thesis-model-comparison` |
-
-Legacy scripts are kept for compatibility, but the commands above should be used in new reproduction runs.
 
 ## Reproducibility notes
 
