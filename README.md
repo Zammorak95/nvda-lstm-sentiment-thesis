@@ -165,9 +165,13 @@ scripts\reproduce_windows.cmd
 
 This creates the virtual environment if needed, installs the project, runs dataset diagnostics, runs the linear-SVM baseline ablation, and generates the combined model-comparison table using the historical final LSTM metrics.
 
-## Canonical command list
+## Documentation
 
-See [Command reference](docs/COMMANDS.md).
+- [Command reference](docs/COMMANDS.md)
+- [Data policy](docs/DATA.md)
+- [Raw-data pipeline notes](docs/RAW_DATA_PIPELINE.md)
+- [Reproducibility guide](docs/REPRODUCIBILITY.md)
+- [Script index](docs/SCRIPT_INDEX.md)
 
 Common commands:
 
@@ -188,6 +192,7 @@ thesis-model-comparison --help
 ├── docs/
 │   ├── COMMANDS.md                  # Canonical command reference
 │   ├── DATA.md                      # Dataset and publication policy
+│   ├── RAW_DATA_PIPELINE.md         # Raw-data reconstruction notes
 │   ├── REPRODUCIBILITY.md           # End-to-end reproduction guide
 │   └── SCRIPT_INDEX.md              # Active scripts and naming conventions
 ├── scripts/
