@@ -19,24 +19,35 @@ Install TensorFlow only when reproducing the LSTM runs:
 python -m pip install tensorflow statsmodels tabulate
 ```
 
-### macOS / Linux
+## 2. Raw-data acquisition
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -e ".[dev]"
+Set your StockData.org token locally as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_KEY`. Do not commit tokens.
+
+Show available acquisition commands:
+
+```cmd
+thesis-fetch-stockdata --help
 ```
 
-Install TensorFlow only when reproducing the LSTM runs:
+Download market/news data:
 
-```bash
-python -m pip install tensorflow statsmodels tabulate
+```cmd
+thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
+thesis-fetch-stockdata market --mode eod --symbol SPY  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
+thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
+thesis-fetch-stockdata market --mode eod --symbol IEF  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
+thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
 ```
 
-For AMD ROCm/Linux, install the TensorFlow build appropriate for the local ROCm setup instead of the generic CPU package.
+Google Trends is downloaded manually from the Google Trends website. Save one full-period monthly export plus smaller daily-window exports in:
 
-## 2. Raw/intermediate data location
+```text
+data/raw/trends/
+```
+
+See `docs/DATA_ACQUISITION.md` for the full process.
+
+## 3. Raw/intermediate data location
 
 Default raw-data locations:
 
@@ -57,7 +68,7 @@ data/model_feed/model_dataset_clean.csv
 
 The dataset is intentionally ignored by Git by default. See `docs/DATA.md` for guidance on whether to publish it.
 
-## 3. Preprocessing pipeline
+## 4. Preprocessing pipeline
 
 Show available preprocessing commands:
 
@@ -86,45 +97,13 @@ thesis-preprocess validate --input data\model_feed\model_dataset_clean.csv
 thesis-preprocess audit --input data\model_feed\model_dataset_clean.csv --output data\model_feed\model_dataset_audit.xlsx
 ```
 
-Output:
-
-```text
-data/interim/news_headlines_master.csv
-data/processed/news_headlines_clean.csv
-data/processed/news_daily_sentiment.csv
-data/processed/NVDA_eod_processed.csv
-data/processed/SPY_eod_processed.csv
-data/processed/SOXX_eod_processed.csv
-data/processed/IEF_eod_processed.csv
-data/interim/nvidia_trends_daily_consistent.csv
-data/processed/nvidia_trends_processed.csv
-data/model_feed/model_dataset.csv
-data/model_feed/model_dataset_clean.csv
-data/model_feed/model_dataset_audit.xlsx
-```
-
-## 4. Dataset diagnostics and thesis figures
+## 5. Dataset diagnostics and thesis figures
 
 ```cmd
 python -m thesis.eval.make_scientific_outputs
 ```
 
-Output:
-
-```text
-artifacts/reports/scientific_outputs/
-```
-
-## 5. Classical baselines with linear SVM
-
-Main benchmark run:
-
-```cmd
-python -m thesis.eval.run_baseline_models_linear_svm ^
-  --outdir artifacts\reports\baseline_models_linear_svm
-```
-
-Feature-set ablation run:
+## 6. Classical baselines with linear SVM
 
 ```cmd
 python -m thesis.eval.run_baseline_models_linear_svm ^
@@ -132,36 +111,13 @@ python -m thesis.eval.run_baseline_models_linear_svm ^
   --outdir artifacts\reports\baseline_models_linear_svm_ablations
 ```
 
-Output:
-
-```text
-artifacts/reports/baseline_models_linear_svm/
-artifacts/reports/baseline_models_linear_svm_ablations/
-```
-
-## 6. LSTM hyperparameter tuning
-
-Short technical smoke test:
-
-```cmd
-thesis-tune-lstm --trials 2 --max_epochs 2 --auto_threshold
-```
-
-Full random-search run:
+## 7. LSTM hyperparameter tuning
 
 ```cmd
 thesis-tune-lstm --trials 50 --auto_threshold
 ```
 
-Equivalent legacy script:
-
-```cmd
-python src\thesis\model_training\optimalisation\random_search_lstm_direction_v2.py --trials 50 --auto_threshold
-```
-
-## 7. Final LSTM walk-forward reproduction
-
-The thesis best-parameter reproduction command is:
+## 8. Final LSTM walk-forward reproduction
 
 ```cmd
 thesis-walkforward-lstm ^
@@ -182,9 +138,7 @@ thesis-walkforward-lstm ^
   --auto_threshold
 ```
 
-On Linux/ROCm, add `--gpu 0` when the ROCm GPU environment is configured.
-
-## 8. LSTM statistical report
+## 9. LSTM statistical report
 
 ```cmd
 python src\thesis\eval\thesis_walkforward_report.py ^
@@ -194,9 +148,7 @@ python src\thesis\eval\thesis_walkforward_report.py ^
   --cost_bps 5
 ```
 
-## 9. Combined LSTM + baseline comparison table
-
-Use the stored final LSTM values from the thesis run:
+## 10. Combined LSTM + baseline comparison table
 
 ```cmd
 thesis-model-comparison ^
@@ -208,29 +160,24 @@ thesis-model-comparison ^
   --outdir artifacts\reports\model_comparison
 ```
 
-Output:
-
-```text
-artifacts/reports/model_comparison/model_comparison_table.csv
-artifacts/reports/model_comparison/model_comparison_classification_table.png
-artifacts/reports/model_comparison/model_comparison_trading_table.png
-artifacts/reports/model_comparison/model_comparison_auc.png
-```
-
-## 10. Recommended reproduction sequence
+## 11. Recommended reproduction sequences
 
 From cleaned dataset:
 
 ```cmd
 python -m thesis.eval.make_scientific_outputs
 python -m thesis.eval.run_baseline_models_linear_svm --run-ablations --outdir artifacts\reports\baseline_models_linear_svm_ablations
-thesis-walkforward-lstm --data data\model_feed\model_dataset_clean.csv --outdir artifacts\models\walk_forward_direction_bestparams_reproduction --lookback 90 --initial_train 700 --val_size 126 --test_horizon 63 --step 63 --epochs 30 --batch 64 --lr 0.0003 --lstm_units 96 --dense_units 64 --dropout 0.10 --recurrent_dropout 0.20 --auto_threshold
 thesis-model-comparison --baseline-metrics artifacts\reports\baseline_models_linear_svm_ablations\tables\baseline_model_metrics.csv --lstm-auc 0.550643920654932 --lstm-accuracy 0.5178571428571429 --lstm-sharpe 0.9957887190041333 --lstm-trade-rate 0.5396825396825397 --outdir artifacts\reports\model_comparison
 ```
 
-From raw files:
+From raw data:
 
 ```cmd
+thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
+thesis-fetch-stockdata market --mode eod --symbol SPY --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
+thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
+thesis-fetch-stockdata market --mode eod --symbol IEF --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
+thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
 thesis-preprocess all
 python -m thesis.eval.make_scientific_outputs
 python -m thesis.eval.run_baseline_models_linear_svm --run-ablations --outdir artifacts\reports\baseline_models_linear_svm_ablations
