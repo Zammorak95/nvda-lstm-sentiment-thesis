@@ -72,6 +72,5 @@ make_model_comparison_table.py
 
 ## Files not recommended for final thesis reporting
 
-- `run_baseline_models.py` with `svm_rbf` should not be used for the final thesis tables unless the RBF kernel is explicitly justified in the methodology.
 - Archived files under `archive/` should be treated as historical references only.
 - Local artifacts under `artifacts/` and `models/` should be regenerated or shared through a release package, not treated as source code.
