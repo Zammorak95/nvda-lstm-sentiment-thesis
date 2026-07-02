@@ -53,6 +53,7 @@ dev = [
 thesis = "thesis.cli:app"
 thesis-scientific-outputs = "thesis.eval.make_scientific_outputs:main"
 thesis-baselines = "thesis.eval.run_baseline_models:main"
+thesis-baselines-linear-svm = "thesis.eval.run_baseline_models_linear_svm:main"
 
 [project.urls]
 Homepage = "https://example.com"
