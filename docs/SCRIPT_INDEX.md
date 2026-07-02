@@ -6,6 +6,7 @@ This file explains which scripts are canonical for reproduction and which files 
 
 | Purpose | Preferred command | Main output |
 |---|---|---|
+| StockData.org raw market/news downloads | `thesis-fetch-stockdata` | `data/raw/` |
 | Full preprocessing pipeline | `thesis-preprocess all` | `data/model_feed/model_dataset_clean.csv` |
 | Preprocessing validation/audit | `thesis-preprocess validate` / `thesis-preprocess audit` | `data/model_feed/model_dataset_audit.xlsx` |
 | Dataset diagnostics and thesis figures | `python -m thesis.eval.make_scientific_outputs` | `artifacts/reports/scientific_outputs/` |
@@ -20,6 +21,7 @@ This file explains which scripts are canonical for reproduction and which files 
 
 | File | Status | Notes |
 |---|---|---|
+| `src/thesis/data_acquisition/stockdata_api.py` | Active | Canonical StockData.org downloader for EOD/intraday market data and news headlines. |
 | `src/thesis/preprocessing/data_pipeline.py` | Active | Canonical preprocessing pipeline: news, sentiment, EOD market features, Google Trends reconstruction, dataset merge, validation and audit. |
 | `src/thesis/eval/make_scientific_outputs.py` | Active | Dataset tables, target distribution, feature correlations, thesis-ready diagnostic figures. |
 | `src/thesis/eval/run_baseline_models_linear_svm.py` | Active | Preferred benchmark runner: majority class, logistic regression, Random Forest, linear SVM. |
@@ -31,32 +33,35 @@ This file explains which scripts are canonical for reproduction and which files 
 | `src/thesis/model_training/optimalisation/random_search_lstm_direction_v2.py` | Legacy active | Original thesis random-search script. Kept for compatibility. |
 | `src/thesis/model_training/optimalisation/walk_forward_lstm_direction_rocm.py` | Legacy active | Original thesis walk-forward script. Kept for compatibility and ROCm/GPU support. |
 
-## Older preprocessing files
+## Older data-acquisition/preprocessing files
 
-The earlier loose preprocessing scripts are now represented by the canonical pipeline command `thesis-preprocess`. They included logic equivalent to:
+The earlier loose acquisition and preprocessing scripts are now represented by canonical commands:
 
-- `data_pipeline_combined.py` — combined news, stock, trends, merge, validation and audit steps.
-- `Stock_preprocessing.py` — stock-specific cleaning and feature engineering.
-- `daily google trends series.py` — Google Trends reconstruction from monthly/daily exports.
-- `model_dataset_clean_and_analyze.py` — dataset validation and feature checks.
+- `nvda_stockdata_fetch_combined.py` -> `thesis-fetch-stockdata`
+- `data_pipeline_combined.py` -> `thesis-preprocess`
+- `Stock_preprocessing.py` -> `thesis-preprocess stock-clean-all`
+- `daily google trends series.py` -> `thesis-preprocess trends-reconstruct` and `thesis-preprocess trends-clean`
+- `model_dataset_clean_and_analyze.py` -> `thesis-preprocess validate`, `thesis-preprocess audit`, and `python -m thesis.eval.make_scientific_outputs`
 
-Do not use the old loose names as the primary reproduction instructions; use `thesis-preprocess` instead.
+Do not use the old loose names as the primary reproduction instructions; use the canonical commands instead.
 
 ## Naming convention going forward
 
 New scripts should follow this pattern:
 
 ```text
-preprocess_*       Create/clean/merge datasets.
-make_*             Generate tables/figures/reports without fitting a model.
-run_*              Fit/evaluate benchmark models.
-tune_*             Search hyperparameters.
-evaluate_*         Final model evaluation.
+data_acquisition/*  Download raw external data.
+preprocessing/*     Create/clean/merge datasets.
+make_*              Generate tables/figures/reports without fitting a model.
+run_*               Fit/evaluate benchmark models.
+tune_*              Search hyperparameters.
+evaluate_*          Final model evaluation.
 ```
 
 Examples:
 
 ```text
+data_acquisition/stockdata_api.py
 preprocessing/data_pipeline.py
 make_scientific_outputs.py
 run_baseline_models_linear_svm.py
