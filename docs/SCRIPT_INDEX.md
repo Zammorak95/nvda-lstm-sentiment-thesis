@@ -6,6 +6,8 @@ This file explains which scripts are canonical for reproduction and which files 
 
 | Purpose | Preferred command | Main output |
 |---|---|---|
+| Full preprocessing pipeline | `thesis-preprocess all` | `data/model_feed/model_dataset_clean.csv` |
+| Preprocessing validation/audit | `thesis-preprocess validate` / `thesis-preprocess audit` | `data/model_feed/model_dataset_audit.xlsx` |
 | Dataset diagnostics and thesis figures | `python -m thesis.eval.make_scientific_outputs` | `artifacts/reports/scientific_outputs/` |
 | Classical benchmarks with linear SVM | `python -m thesis.eval.run_baseline_models_linear_svm` | `artifacts/reports/baseline_models_linear_svm/` |
 | Feature-set ablations | `python -m thesis.eval.run_baseline_models_linear_svm --run-ablations` | `artifacts/reports/baseline_models_linear_svm_ablations/` |
@@ -18,6 +20,7 @@ This file explains which scripts are canonical for reproduction and which files 
 
 | File | Status | Notes |
 |---|---|---|
+| `src/thesis/preprocessing/data_pipeline.py` | Active | Canonical preprocessing pipeline: news, sentiment, EOD market features, Google Trends reconstruction, dataset merge, validation and audit. |
 | `src/thesis/eval/make_scientific_outputs.py` | Active | Dataset tables, target distribution, feature correlations, thesis-ready diagnostic figures. |
 | `src/thesis/eval/run_baseline_models_linear_svm.py` | Active | Preferred benchmark runner: majority class, logistic regression, Random Forest, linear SVM. |
 | `src/thesis/eval/run_baseline_models.py` | Active but optional | Original benchmark runner. Includes `svm_rbf`; do not use for final thesis results unless explicitly discussed. |
@@ -28,20 +31,33 @@ This file explains which scripts are canonical for reproduction and which files 
 | `src/thesis/model_training/optimalisation/random_search_lstm_direction_v2.py` | Legacy active | Original thesis random-search script. Kept for compatibility. |
 | `src/thesis/model_training/optimalisation/walk_forward_lstm_direction_rocm.py` | Legacy active | Original thesis walk-forward script. Kept for compatibility and ROCm/GPU support. |
 
+## Older preprocessing files
+
+The earlier loose preprocessing scripts are now represented by the canonical pipeline command `thesis-preprocess`. They included logic equivalent to:
+
+- `data_pipeline_combined.py` — combined news, stock, trends, merge, validation and audit steps.
+- `Stock_preprocessing.py` — stock-specific cleaning and feature engineering.
+- `daily google trends series.py` — Google Trends reconstruction from monthly/daily exports.
+- `model_dataset_clean_and_analyze.py` — dataset validation and feature checks.
+
+Do not use the old loose names as the primary reproduction instructions; use `thesis-preprocess` instead.
+
 ## Naming convention going forward
 
-New evaluation scripts should follow this pattern:
+New scripts should follow this pattern:
 
 ```text
-make_*              Generate tables/figures/reports without fitting a model.
-run_*               Fit/evaluate benchmark models.
-tune_*              Search hyperparameters.
-evaluate_*          Final model evaluation.
+preprocess_*       Create/clean/merge datasets.
+make_*             Generate tables/figures/reports without fitting a model.
+run_*              Fit/evaluate benchmark models.
+tune_*             Search hyperparameters.
+evaluate_*         Final model evaluation.
 ```
 
 Examples:
 
 ```text
+preprocessing/data_pipeline.py
 make_scientific_outputs.py
 run_baseline_models_linear_svm.py
 tune_lstm_direction.py
