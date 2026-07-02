@@ -8,7 +8,7 @@ The reproducible workflow has three levels:
 
 1. **Report-level reproduction**: recreate tables and figures from `data/model_feed/model_dataset_clean.csv`.
 2. **Model-level reproduction**: rerun baselines and LSTM walk-forward validation from the cleaned dataset.
-3. **Full raw-data reproduction**: rerun data collection and preprocessing from the original raw sources.
+3. **Full raw-data reproduction**: rerun preprocessing from the original raw source files into `model_dataset_clean.csv`.
 
 The most reliable and practical route is level 1 or 2. Exact retraining of the LSTM can vary slightly because neural-network training is stochastic and can differ across CPU/GPU, TensorFlow version and operating system.
 
@@ -20,7 +20,7 @@ Use branch:
 git switch main_v2
 ```
 
-Expected input:
+Expected clean input for report/model reproduction:
 
 ```text
 data/model_feed/model_dataset_clean.csv
@@ -49,9 +49,42 @@ python -m pip install tensorflow statsmodels tabulate
 
 For non-LSTM report reproduction, TensorFlow is not required. It is only needed for LSTM random search and walk-forward training.
 
-## Step 2 — Place the cleaned dataset
+## Step 2A — Reproduce from raw/intermediate data
 
-Place the cleaned dataset here:
+If the raw files are available in the expected layout, run:
+
+```cmd
+thesis-preprocess all
+```
+
+This creates:
+
+```text
+data/interim/news_headlines_master.csv
+data/processed/news_headlines_clean.csv
+data/processed/news_daily_sentiment.csv
+data/processed/NVDA_eod_processed.csv
+data/processed/SPY_eod_processed.csv
+data/processed/SOXX_eod_processed.csv
+data/processed/IEF_eod_processed.csv
+data/interim/nvidia_trends_daily_consistent.csv
+data/processed/nvidia_trends_processed.csv
+data/model_feed/model_dataset.csv
+data/model_feed/model_dataset_clean.csv
+data/model_feed/model_dataset_audit.xlsx
+```
+
+Use this command to inspect preprocessing subcommands:
+
+```cmd
+thesis-preprocess --help
+```
+
+See `docs/PREPROCESSING.md` for a stage-by-stage explanation.
+
+## Step 2B — Reproduce from the cleaned dataset
+
+If raw files are unavailable, place the cleaned dataset here:
 
 ```text
 data/model_feed/model_dataset_clean.csv
@@ -153,6 +186,8 @@ thesis-model-comparison ^
 ## Final output files to inspect
 
 ```text
+data/model_feed/model_dataset_clean.csv
+data/model_feed/model_dataset_audit.xlsx
 artifacts/reports/scientific_outputs/
 artifacts/reports/baseline_models_linear_svm_ablations/figures/
 artifacts/reports/baseline_models_linear_svm_ablations/tables/
@@ -162,6 +197,7 @@ artifacts/reports/model_comparison/
 
 ## Reproducibility caveats
 
+- Raw-data reproduction requires access to the original raw CSV/API exports and their licences.
 - Random Forest results are seeded and should be stable.
 - Logistic regression and linear SVM should be stable given the same data and package versions.
 - LSTM training can vary across repeated runs.
