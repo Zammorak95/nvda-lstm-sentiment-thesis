@@ -1,4 +1,4 @@
-# NVDA LSTM Sentiment Thesis
+# NVDA LSTM Thesis
 
 This repository contains the code used for a Master's thesis on forecasting NVIDIA (NVDA) next-day stock-price direction using LSTM models, market variables, news sentiment, Google Trends attention variables and classical machine-learning benchmarks.
 
