@@ -3,12 +3,15 @@
 Auto-window wrapper around run_stock_pipeline.py.
 
 The limiting source for a sentiment-augmented stock dataset is often StockData
-news coverage. This wrapper first discovers the earliest date on which
-symbol-filtered news is available, then uses that as the news/model window start.
-The collection end date defaults to yesterday in Europe/Amsterdam.
+news coverage. This wrapper discovers the earliest date on which symbol-filtered
+news is available, then uses that as the news/model window start. To avoid a
+large number of API calls, the scan is hierarchical: year probes first, then
+month probes inside the first positive year, then daily probes inside the first
+positive month.
 
-Raw/intermediate data are still checkpointed by run_stock_pipeline.py.
-The news availability scan itself is also saved so it can be resumed.
+The collection end date defaults to yesterday in Europe/Amsterdam. Raw and
+intermediate data are still checkpointed by run_stock_pipeline.py. The news
+availability scan itself is also saved so it can be resumed and audited.
 
 Examples:
   python -u run_stock_pipeline_auto_window.py all --symbol AMD --keyword "AMD stock" --scan-start 2018-01-01
@@ -51,6 +54,26 @@ def parse_date(value: str) -> date:
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
+def month_start_end(d: date) -> tuple[date, date]:
+    start = d.replace(day=1)
+    if d.month == 12:
+        next_month = d.replace(year=d.year + 1, month=1, day=1)
+    else:
+        next_month = d.replace(month=d.month + 1, day=1)
+    return start, next_month - timedelta(days=1)
+
+
+def month_iter(start: date, end: date):
+    cur = start.replace(day=1)
+    while cur <= end:
+        m_start, m_end = month_start_end(cur)
+        yield max(m_start, start), min(m_end, end)
+        if cur.month == 12:
+            cur = cur.replace(year=cur.year + 1, month=1, day=1)
+        else:
+            cur = cur.replace(month=cur.month + 1, day=1)
+
+
 def date_range(start: date, end: date):
     cur = start
     while cur <= end:
@@ -79,23 +102,49 @@ def scan_progress_path(data_dir: Path, symbol: str) -> Path:
     return data_dir / "raw" / f"news_headlines_{slug}" / f"{symbol.upper()}_news_availability_scan.csv"
 
 
-def scan_one_day(
+def get_header(headers: requests.structures.CaseInsensitiveDict, name: str) -> str:
+    return headers.get(name, "") or headers.get(name.lower(), "") or headers.get(name.upper(), "") or ""
+
+
+def response_limit_headers(response: requests.Response) -> dict[str, str]:
+    return {
+        "x_ratelimit_limit": get_header(response.headers, "X-RateLimit-Limit"),
+        "x_ratelimit_remaining": get_header(response.headers, "X-RateLimit-Remaining"),
+        "x_usagelimit_limit": get_header(response.headers, "X-UsageLimit-Limit"),
+        "x_usagelimit_remaining": get_header(response.headers, "X-UsageLimit-Remaining"),
+    }
+
+
+def scan_news_query(
     session: requests.Session,
     token: str,
     symbol: str,
-    day: date,
     limit: int,
-) -> tuple[int, int]:
+    *,
+    published_on: date | None = None,
+    published_after: date | None = None,
+    published_before: date | None = None,
+) -> tuple[int, int, dict[str, str]]:
     params = {
         "api_token": token,
         "symbols": symbol.upper(),
         "filter_entities": "true",
         "language": "en",
-        "published_on": day.isoformat(),
         "limit": str(limit),
         "page": "1",
     }
+
+    if published_on is not None:
+        params["published_on"] = published_on.isoformat()
+    else:
+        if published_after is None or published_before is None:
+            raise ValueError("Range probes require published_after and published_before.")
+        params["published_after"] = published_after.isoformat()
+        # Add one day outside this function when an inclusive end is desired.
+        params["published_before"] = published_before.isoformat()
+
     response = session.get(base.STOCKDATA_NEWS_URL, params=params, timeout=30)
+    limit_headers = response_limit_headers(response)
     response.raise_for_status()
     payload = response.json()
     if isinstance(payload, dict) and payload.get("error"):
@@ -104,11 +153,146 @@ def scan_one_day(
     articles = payload.get("data", []) if isinstance(payload, dict) else []
     found = int(meta.get("found", 0) or 0)
     returned = len(articles)
-    return found, returned
+    return found, returned, limit_headers
+
+
+SCAN_COLUMNS = [
+    "scan_level",
+    "range_start",
+    "range_end",
+    "symbol",
+    "found",
+    "returned",
+    "limit",
+    "status",
+    "error",
+    "x_ratelimit_limit",
+    "x_ratelimit_remaining",
+    "x_usagelimit_limit",
+    "x_usagelimit_remaining",
+    "scanned_at_utc",
+]
+
+
+def read_scan_progress(progress: Path) -> pd.DataFrame:
+    if not progress.exists():
+        return pd.DataFrame(columns=SCAN_COLUMNS)
+    df = pd.read_csv(progress)
+    for col in SCAN_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+    return df[SCAN_COLUMNS]
+
+
+def write_scan_progress(progress: Path, df: pd.DataFrame) -> None:
+    progress.parent.mkdir(parents=True, exist_ok=True)
+    df = df[SCAN_COLUMNS].drop_duplicates(subset=["scan_level", "range_start", "range_end", "symbol"], keep="last")
+    df = df.sort_values(["scan_level", "range_start", "range_end"])
+    df.to_csv(progress, index=False)
+
+
+def cached_or_probe(
+    *,
+    args: argparse.Namespace,
+    session: requests.Session,
+    token: str,
+    progress: Path,
+    df_progress: pd.DataFrame,
+    level: str,
+    start: date,
+    end: date,
+) -> tuple[int, int, pd.DataFrame]:
+    symbol = args.symbol.upper()
+    start_s = start.isoformat()
+    end_s = end.isoformat()
+
+    mask = (
+        df_progress["scan_level"].astype(str).eq(level)
+        & df_progress["range_start"].astype(str).eq(start_s)
+        & df_progress["range_end"].astype(str).eq(end_s)
+        & df_progress["symbol"].astype(str).eq(symbol)
+        & df_progress["status"].astype(str).eq("done")
+    )
+    if mask.any() and not args.force_scan:
+        row = df_progress.loc[mask].iloc[-1]
+        found = int(float(row.get("found", 0) or 0))
+        returned = int(float(row.get("returned", 0) or 0))
+        print(f"  [CACHE {level.upper()}] {start_s} -> {end_s} found={found} returned={returned}")
+        return found, returned, df_progress
+
+    for attempt in range(1, args.scan_retries + 1):
+        try:
+            if level == "day":
+                found, returned, headers = scan_news_query(
+                    session,
+                    token,
+                    symbol,
+                    args.news_limit_per_day,
+                    published_on=start,
+                )
+            else:
+                # StockData supports published_after/published_before for range queries.
+                # Use end + 1 day so the range is effectively inclusive of the end date.
+                found, returned, headers = scan_news_query(
+                    session,
+                    token,
+                    symbol,
+                    args.news_limit_per_day,
+                    published_after=start,
+                    published_before=end + timedelta(days=1),
+                )
+
+            row = {
+                "scan_level": level,
+                "range_start": start_s,
+                "range_end": end_s,
+                "symbol": symbol,
+                "found": found,
+                "returned": returned,
+                "limit": args.news_limit_per_day,
+                "status": "done",
+                "error": "",
+                **headers,
+                "scanned_at_utc": datetime.now(timezone.utc).isoformat(),
+            }
+            df_progress = pd.concat([df_progress, pd.DataFrame([row])], ignore_index=True)
+            write_scan_progress(progress, df_progress)
+            print(f"  [SCAN {level.upper()}] {start_s} -> {end_s} found={found} returned={returned}")
+            return found, returned, df_progress
+        except Exception as exc:  # noqa: BLE001
+            if attempt >= args.scan_retries:
+                row = {
+                    "scan_level": level,
+                    "range_start": start_s,
+                    "range_end": end_s,
+                    "symbol": symbol,
+                    "found": "",
+                    "returned": "",
+                    "limit": args.news_limit_per_day,
+                    "status": "error",
+                    "error": str(exc),
+                    "x_ratelimit_limit": "",
+                    "x_ratelimit_remaining": "",
+                    "x_usagelimit_limit": "",
+                    "x_usagelimit_remaining": "",
+                    "scanned_at_utc": datetime.now(timezone.utc).isoformat(),
+                }
+                df_progress = pd.concat([df_progress, pd.DataFrame([row])], ignore_index=True)
+                write_scan_progress(progress, df_progress)
+                if not args.continue_on_scan_error:
+                    raise
+                print(f"  [SCAN ERR] {level} {start_s}->{end_s}: {exc}")
+                return 0, 0, df_progress
+
+            wait = random.uniform(args.scan_sleep_min, args.scan_sleep_max) * attempt
+            print(f"  [WARN] {level} {start_s}->{end_s} attempt {attempt} failed: {exc}; sleep {wait:.1f}s")
+            time.sleep(wait)
+
+    return 0, 0, df_progress
 
 
 def discover_first_news_date(args: argparse.Namespace) -> str:
-    """Find earliest day with StockData symbol-filtered news and checkpoint each day."""
+    """Find earliest day with StockData symbol-filtered news using year->month->day probes."""
     token = get_stockdata_token()
     symbol = args.symbol.upper()
     start = parse_date(args.scan_start)
@@ -117,102 +301,89 @@ def discover_first_news_date(args: argparse.Namespace) -> str:
         raise ValueError(f"--end ({end}) must be >= --scan-start ({start})")
 
     progress = scan_progress_path(args.data_dir, symbol)
-    progress.parent.mkdir(parents=True, exist_ok=True)
+    df_progress = read_scan_progress(progress)
 
-    existing = pd.DataFrame()
-    if progress.exists() and not args.force_scan:
-        existing = pd.read_csv(progress)
-        if not existing.empty and "found" in existing.columns:
-            hits = existing[pd.to_numeric(existing["found"], errors="coerce").fillna(0) > 0]
+    # If an exact positive day was already found, reuse it immediately.
+    if not df_progress.empty and not args.force_scan:
+        day_rows = df_progress[
+            df_progress["scan_level"].astype(str).eq("day")
+            & df_progress["symbol"].astype(str).eq(symbol)
+            & df_progress["status"].astype(str).eq("done")
+        ].copy()
+        if not day_rows.empty:
+            day_rows["found_num"] = pd.to_numeric(day_rows["found"], errors="coerce").fillna(0)
+            hits = day_rows[day_rows["found_num"] > 0]
             if not hits.empty:
-                first = str(hits.sort_values("date").iloc[0]["date"])
-                print(f"[SCAN] Existing first news date for {symbol}: {first}")
+                first = str(hits.sort_values("range_start").iloc[0]["range_start"])
+                print(f"[SCAN] Existing first exact news date for {symbol}: {first}")
                 return first
 
-    completed = set(existing["date"].astype(str)) if not existing.empty and "date" in existing.columns and not args.force_scan else set()
     session = requests.Session()
     session.headers.update({"User-Agent": "thesis-news-availability-scan/1.0"})
 
-    field_order = [
-        "date",
-        "symbol",
-        "found",
-        "returned",
-        "limit",
-        "status",
-        "error",
-        "scanned_at_utc",
-    ]
+    print(f"[SCAN] Hierarchical news availability scan for {symbol}: {start} -> {end}")
+    print("[SCAN] Strategy: year probes -> month probes -> day probes, to minimize API calls.")
 
-    def append_row(row: dict) -> None:
-        row = {key: row.get(key, "") for key in field_order}
-        df_row = pd.DataFrame([row])
-        if progress.exists() and not args.force_scan:
-            df_old = pd.read_csv(progress)
-            df = pd.concat([df_old, df_row], ignore_index=True)
-        else:
-            df = df_row
-        df = df.drop_duplicates(subset=["date", "symbol"], keep="last").sort_values("date")
-        df.to_csv(progress, index=False)
-
-    print(f"[SCAN] Searching first StockData news date for {symbol}: {start} -> {end}")
-    for day in date_range(start, end):
-        if day.isoformat() in completed:
-            continue
-
-        try:
-            found, returned = 0, 0
-            last_exc: Exception | None = None
-            for attempt in range(1, args.scan_retries + 1):
-                try:
-                    found, returned = scan_one_day(session, token, symbol, day, args.news_limit_per_day)
-                    last_exc = None
-                    break
-                except Exception as exc:  # noqa: BLE001
-                    last_exc = exc
-                    if attempt >= args.scan_retries:
-                        raise
-                    wait = random.uniform(args.scan_sleep_min, args.scan_sleep_max) * attempt
-                    print(f"  [WARN] {day} attempt {attempt} failed: {exc}; sleep {wait:.1f}s")
-                    time.sleep(wait)
-
-            append_row(
-                {
-                    "date": day.isoformat(),
-                    "symbol": symbol,
-                    "found": found,
-                    "returned": returned,
-                    "limit": args.news_limit_per_day,
-                    "status": "done",
-                    "error": "" if last_exc is None else str(last_exc),
-                    "scanned_at_utc": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            print(f"  [SCAN DAY] {day} found={found} returned={returned}")
-            if found > 0 or returned > 0:
-                print(f"[SCAN] First news date for {symbol}: {day}")
-                print(f"[SCAN] Progress saved to: {progress}")
-                return day.isoformat()
-        except Exception as exc:  # noqa: BLE001
-            append_row(
-                {
-                    "date": day.isoformat(),
-                    "symbol": symbol,
-                    "found": "",
-                    "returned": "",
-                    "limit": args.news_limit_per_day,
-                    "status": "error",
-                    "error": str(exc),
-                    "scanned_at_utc": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            if not args.continue_on_scan_error:
-                raise
-            print(f"  [SCAN ERR] {day}: {exc}")
-
+    first_year: tuple[date, date] | None = None
+    for year in range(start.year, end.year + 1):
+        y_start = max(date(year, 1, 1), start)
+        y_end = min(date(year, 12, 31), end)
+        found, returned, df_progress = cached_or_probe(
+            args=args,
+            session=session,
+            token=token,
+            progress=progress,
+            df_progress=df_progress,
+            level="year",
+            start=y_start,
+            end=y_end,
+        )
+        if found > 0 or returned > 0:
+            first_year = (y_start, y_end)
+            break
         random_sleep(args.scan_sleep_min, args.scan_sleep_max)
 
-    raise RuntimeError(f"No StockData news found for {symbol} between {start} and {end}.")
+    if first_year is None:
+        raise RuntimeError(f"No StockData news found for {symbol} between {start} and {end}.")
+
+    first_month: tuple[date, date] | None = None
+    for m_start, m_end in month_iter(first_year[0], first_year[1]):
+        found, returned, df_progress = cached_or_probe(
+            args=args,
+            session=session,
+            token=token,
+            progress=progress,
+            df_progress=df_progress,
+            level="month",
+            start=m_start,
+            end=m_end,
+        )
+        if found > 0 or returned > 0:
+            first_month = (m_start, m_end)
+            break
+        random_sleep(args.scan_sleep_min, args.scan_sleep_max)
+
+    if first_month is None:
+        raise RuntimeError(f"Year probe found news for {symbol}, but no positive month was identified.")
+
+    for day in date_range(first_month[0], first_month[1]):
+        found, returned, df_progress = cached_or_probe(
+            args=args,
+            session=session,
+            token=token,
+            progress=progress,
+            df_progress=df_progress,
+            level="day",
+            start=day,
+            end=day,
+        )
+        if found > 0 or returned > 0:
+            print(f"[SCAN] First exact news date for {symbol}: {day}")
+            print(f"[SCAN] Progress saved to: {progress}")
+            return day.isoformat()
+        random_sleep(args.scan_sleep_min, args.scan_sleep_max)
+
+    raise RuntimeError(f"Month probe found news for {symbol}, but no exact positive day was identified.")
 
 
 def build_base_args(args: argparse.Namespace, news_start: str) -> SimpleNamespace:
@@ -280,8 +451,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--news-retries", type=int, default=5)
     ap.add_argument("--continue-on-news-error", action="store_true")
 
-    ap.add_argument("--scan-sleep-min", type=float, default=0.25)
-    ap.add_argument("--scan-sleep-max", type=float, default=0.9)
+    ap.add_argument("--scan-sleep-min", type=float, default=0.8)
+    ap.add_argument("--scan-sleep-max", type=float, default=2.5)
     ap.add_argument("--scan-retries", type=int, default=4)
     ap.add_argument("--force-scan", action="store_true")
     ap.add_argument("--continue-on-scan-error", action="store_true")
