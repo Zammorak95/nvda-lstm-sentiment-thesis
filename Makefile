@@ -1,22 +1,18 @@
 # Common workflows
-.PHONY: help install format lint test run fetch-nvda fetch-macro fetch-news preprocess preprocess-validate preprocess-audit scientific scientific-test baselines baselines-ablations baselines-linear-svm baselines-linear-svm-ablations lstm-tune lstm-walkforward model-comparison reproduce-lite
+.PHONY: help install format lint test run pipeline-env pipeline-main pipeline-all pipeline-legacy fetch-nvda fetch-macro fetch-news preprocess preprocess-validate preprocess-audit scientific scientific-test baselines baselines-ablations baselines-linear-svm baselines-linear-svm-ablations lstm-tune lstm-walkforward model-comparison reproduce-lite
 
 help:
 	@echo "Available targets:"
 	@echo "  install                         Install project in editable mode"
-	@echo "  fetch-nvda                      Fetch NVDA EOD data from StockData.org"
-	@echo "  fetch-macro                     Fetch SPY/SOXX/IEF EOD data from StockData.org"
-	@echo "  fetch-news                      Fetch NVDA news headlines from StockData.org"
-	@echo "  preprocess                      Run the full preprocessing pipeline"
-	@echo "  preprocess-validate             Validate data/model_feed/model_dataset_clean.csv"
-	@echo "  preprocess-audit                Write model_dataset_audit.xlsx"
+	@echo "  pipeline-env                    Check generic full-pipeline configuration"
+	@echo "  pipeline-main                   Run generic full thesis pipeline without fixed comparisons"
+	@echo "  pipeline-all                    Run generic full thesis pipeline including fixed comparisons"
+	@echo "  pipeline-legacy                 Run historical 0.5506-parameter LSTM check"
+	@echo "  fetch-nvda / fetch-macro/news   Legacy direct StockData fetch helpers"
+	@echo "  preprocess                      Legacy preprocessing helper"
 	@echo "  scientific                      Generate dataset diagnostics and figures"
-	@echo "  baselines-linear-svm            Run final classical baselines"
 	@echo "  baselines-linear-svm-ablations  Run final baselines with feature ablations"
-	@echo "  lstm-tune                       Run LSTM random search"
-	@echo "  lstm-walkforward                Run final LSTM walk-forward specification"
 	@echo "  model-comparison                Generate combined LSTM + baseline tables"
-	@echo "  reproduce-lite                  Run non-LSTM reproduction outputs"
 	@echo "  test / lint / format            Developer utilities"
 
 install:
@@ -34,6 +30,18 @@ test:
 
 run:
 	python -m thesis.cli --help
+
+pipeline-env:
+	ROOT=$$(pwd) PYTHON=python bash scripts/run_stock_full_pipeline.sh env
+
+pipeline-main:
+	SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 TRIALS=50 GPU=0 bash scripts/run_stock_full_pipeline.sh main
+
+pipeline-all:
+	SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 TRIALS=50 GPU=0 bash scripts/run_stock_full_pipeline.sh all
+
+pipeline-legacy:
+	SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 GPU=0 bash scripts/run_stock_full_pipeline.sh legacy_05506
 
 fetch-nvda:
 	thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
@@ -61,11 +69,9 @@ scientific:
 scientific-test:
 	python -m thesis.eval.make_scientific_outputs --run-pytest
 
-# Original baseline runner. Kept for compatibility; final thesis tables should use linear SVM.
 baselines:
 	python -m thesis.eval.run_baseline_models
 
-# Original baseline ablations. Kept for compatibility; final thesis tables should use linear SVM.
 baselines-ablations:
 	python -m thesis.eval.run_baseline_models --run-ablations
 
