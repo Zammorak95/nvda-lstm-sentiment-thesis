@@ -1,241 +1,157 @@
 # NVDA LSTM Thesis
 
-This repository contains the code used for a Master's thesis on forecasting NVIDIA (NVDA) next-day stock-price direction using LSTM models, market variables, news sentiment, Google Trends attention variables and classical machine-learning benchmarks.
+This repository contains the code used for a Master's thesis on next-day stock-direction prediction with LSTM models, market variables, news sentiment and Google Trends attention variables. The original case study is NVIDIA (NVDA), with AMD used as an additional robustness check.
 
-The repository is structured to make the empirical workflow reproducible: from raw-data acquisition and preprocessing to the cleaned modelling dataset, dataset diagnostics, benchmark models, LSTM walk-forward evaluation and final thesis-ready tables/figures.
-
-## Research workflow
+The current workflow is designed to be reproducible from raw data to final model summaries:
 
 ```text
-StockData.org market/news downloads + manual Google Trends exports
+StockData.org EOD prices + StockData.org news + Google Trends via PyTrends
+  -> raw/intermediate checkpoint files
   -> preprocessing and feature engineering
-  -> data/model_feed/model_dataset_clean.csv
-  -> dataset diagnostics and feature assessment
-  -> classical benchmark models
-  -> LSTM walk-forward validation
-  -> combined model-comparison tables and figures
+  -> model dataset and audit workbook
+  -> reduced feature dataset
+  -> random-search hyperparameter optimization
+  -> walk-forward LSTM using the best random-search hyperparameters
+  -> gross thesis reports, figures, tables and summary CSVs
 ```
 
-The most important reproducibility input is:
+## Main end-to-end pipeline
+
+Use the generic pipeline for both NVDA and AMD. The only stock-specific inputs are the ticker, Google Trends search term, optional scan start and end date.
+
+```bash
+cd /home/zammorak/thesis
+source .venv/bin/activate
+set -a
+source .env
+set +a
+```
+
+Run the full NVIDIA pipeline:
+
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 TRIALS=50 GPU=0 \
+  bash scripts/run_stock_full_pipeline.sh all
+```
+
+Run the full AMD robustness pipeline:
+
+```bash
+SYMBOL=AMD KEYWORD="AMD stock" END=2026-02-26 TRIALS=50 GPU=0 \
+  bash scripts/run_stock_full_pipeline.sh all
+```
+
+The same script can be run in phases:
+
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 bash scripts/run_stock_full_pipeline.sh data
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh reduced
+SYMBOL=NVDA KEYWORD="NVIDIA stock" TRIALS=50 GPU=0 bash scripts/run_stock_full_pipeline.sh random_search
+SYMBOL=NVDA KEYWORD="NVIDIA stock" GPU=0 bash scripts/run_stock_full_pipeline.sh walk_bestparams
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh report_bestparams
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh summary
+```
+
+The main modelling route is:
 
 ```text
-data/model_feed/model_dataset_clean.csv
+data -> reduced -> random_search -> walk_bestparams -> report_bestparams -> summary
 ```
 
-Canonical raw-data and preprocessing entry points:
+Optional fixed-parameter comparison runs can also be executed:
 
-```cmd
-thesis-fetch-stockdata --help
-thesis-preprocess --help
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" GPU=0 bash scripts/run_stock_full_pipeline.sh fixed_compare
 ```
 
-## Quickstart: reproduce the main tables and figures
+These fixed runs are comparison checks only. The primary model result is the walk-forward run using the best hyperparameters found by random search.
 
-### 1. Clone and select the branch
+## API-conscious raw-data handling
 
-```cmd
+The pipeline avoids unnecessary API calls:
+
+- if processed EOD files already exist, it skips EOD API fetching;
+- if raw EOD CSVs already exist, it reuses and processes them;
+- if processed Google Trends exists, it skips PyTrends;
+- if intermediate Google Trends chunks exist, it resumes from them;
+- if raw news CSVs or processed daily sentiment already exist, it does not call the StockData news API;
+- if `NEWS_START=auto`, it first tries to infer the start date from local news/sentiment files and only scans StockData when no local start date is available.
+
+The default news start is based on the earliest locally available or scanned StockData news date for the ticker. The default end date is yesterday, but thesis reproduction should usually pass an explicit `END`.
+
+## Important outputs
+
+For a ticker such as `NVDA`, the main outputs are:
+
+```text
+data/model_feed/nvda_model_dataset.csv
+data/model_feed/nvda_model_dataset_clean.csv
+data/model_feed/nvda_model_dataset_audit.xlsx
+artifacts/models/nvda_random_search_reduced_features/
+artifacts/models/nvda_walk_forward_random_search_bestparams/
+artifacts/models/nvda_walk_forward_random_search_bestparams/thesis_report_gross/
+artifacts/reports/nvda_full_pipeline_summary.csv
+```
+
+For AMD, the same structure is created with the `amd_` prefix.
+
+## Configuration
+
+Common environment variables:
+
+```text
+SYMBOL                  Stock ticker, e.g. NVDA or AMD
+KEYWORD                 Google Trends term, e.g. "NVIDIA stock" or "AMD stock"
+SCAN_START              Earliest date to test for news availability, default 2018-01-01
+END                     Final date for the data window; default is yesterday
+NEWS_START              auto or explicit YYYY-MM-DD
+NEWS_LIMIT_PER_DAY      StockData news limit per day, default 10
+MARKET_BUFFER_DAYS      Extra market/Trends history before news_start, default 45
+TRIALS                  Random-search trials, default 50
+RANDOM_EPOCHS           Max epochs per random-search trial, default 50
+WALK_EPOCHS             Epochs for final walk-forward training, default 30
+GPU                     ROCm GPU index, usually 0
+FORCE                   Set to 1 to rebuild/refetch even if files exist
+```
+
+## Repository setup
+
+Clone and select the working branch:
+
+```bash
 git clone https://github.com/Zammorak95/nvda-lstm-sentiment-thesis.git
 cd nvda-lstm-sentiment-thesis
 git switch main_v2
 ```
 
-### 2. Create a virtual environment
+Create a virtual environment:
 
-Windows CMD:
-
-```cmd
-python -m venv .venv
-.venv\Scripts\activate.bat
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e ".[dev]"
+python -m pip install tensorflow statsmodels tabulate pytrends
 ```
-
-For a stricter reproducibility-oriented environment, use:
-
-```cmd
-python -m pip install -r requirements-reproducibility.txt
-python -m pip install -e ".[dev]"
-```
-
-TensorFlow is only needed for rerunning LSTM training:
-
-```cmd
-python -m pip install tensorflow statsmodels tabulate
-```
-
-### 3A. Acquire raw market/news data and Google Trends exports
 
 Set the StockData.org token locally as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_KEY`. Never commit tokens. Use `.env.example` as a template.
-
-Download StockData.org market and news data:
-
-```cmd
-thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
-thesis-fetch-stockdata market --mode eod --symbol SPY  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
-thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
-thesis-fetch-stockdata market --mode eod --symbol IEF  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
-thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
-```
-
-Google Trends was downloaded manually: one full-period monthly export plus smaller daily-window exports. Save these in `data/raw/trends/`. See [Raw-data acquisition](docs/DATA_ACQUISITION.md).
-
-### 3B. Build the cleaned dataset from raw/intermediate files
-
-If the raw files are available in the expected `data/raw/` layout, run:
-
-```cmd
-thesis-preprocess all
-```
-
-This creates:
-
-```text
-data/model_feed/model_dataset.csv
-data/model_feed/model_dataset_clean.csv
-data/model_feed/model_dataset_audit.xlsx
-```
-
-See [Preprocessing pipeline](docs/PREPROCESSING.md) for the individual stages.
-
-### 3C. Or add the cleaned dataset directly
-
-If raw files are unavailable, place the cleaned dataset at:
-
-```text
-data/model_feed/model_dataset_clean.csv
-```
-
-See [Dataset schema](docs/DATASET_SCHEMA.md) for the expected columns.
-
-### 4. Generate dataset diagnostics
-
-```cmd
-python -m thesis.eval.make_scientific_outputs
-```
-
-### 5. Run classical baselines with linear SVM
-
-```cmd
-python -m thesis.eval.run_baseline_models_linear_svm ^
-  --run-ablations ^
-  --outdir artifacts\reports\baseline_models_linear_svm_ablations
-```
-
-### 6. Reproduce the final LSTM walk-forward specification
-
-```cmd
-thesis-walkforward-lstm ^
-  --data data\model_feed\model_dataset_clean.csv ^
-  --outdir artifacts\models\walk_forward_direction_bestparams_reproduction ^
-  --lookback 90 ^
-  --initial_train 700 ^
-  --val_size 126 ^
-  --test_horizon 63 ^
-  --step 63 ^
-  --epochs 30 ^
-  --batch 64 ^
-  --lr 0.0003 ^
-  --lstm_units 96 ^
-  --dense_units 64 ^
-  --dropout 0.10 ^
-  --recurrent_dropout 0.20 ^
-  --auto_threshold
-```
-
-### 7. Generate combined LSTM + benchmark comparison tables
-
-```cmd
-thesis-model-comparison ^
-  --baseline-metrics artifacts\reports\baseline_models_linear_svm_ablations\tables\baseline_model_metrics.csv ^
-  --lstm-auc 0.550643920654932 ^
-  --lstm-accuracy 0.5178571428571429 ^
-  --lstm-sharpe 0.9957887190041333 ^
-  --lstm-trade-rate 0.5396825396825397 ^
-  --outdir artifacts\reports\model_comparison
-```
-
-## One-command Windows reproduction
-
-After placing `data/model_feed/model_dataset_clean.csv`, run:
-
-```cmd
-scripts\reproduce_windows.cmd
-```
-
-## Documentation
-
-- [Command reference](docs/COMMANDS.md)
-- [Data files and dataset placement](docs/DATA.md)
-- [Dataset schema](docs/DATASET_SCHEMA.md)
-- [Expected outputs](docs/EXPECTED_OUTPUTS.md)
-- [Raw-data acquisition](docs/DATA_ACQUISITION.md)
-- [Preprocessing pipeline](docs/PREPROCESSING.md)
-- [Raw-data pipeline notes](docs/RAW_DATA_PIPELINE.md)
-- [Reproducibility guide](docs/REPRODUCIBILITY.md)
-- [Script index](docs/SCRIPT_INDEX.md)
-
-Common commands:
-
-```cmd
-thesis-fetch-stockdata --help
-thesis-preprocess --help
-thesis-preprocess all
-python -m thesis.eval.make_scientific_outputs
-python -m thesis.eval.run_baseline_models_linear_svm --run-ablations
-thesis-tune-lstm --trials 50 --auto_threshold
-thesis-walkforward-lstm --help
-thesis-model-comparison --help
-```
 
 ## Project layout
 
 ```text
 .
-├── data/
-│   └── model_feed/                 # Expected location for model_dataset_clean.csv
-├── docs/
-│   ├── COMMANDS.md                  # Canonical command reference
-│   ├── DATA.md                      # Dataset placement and local data workflow
-│   ├── DATASET_SCHEMA.md            # Expected clean-dataset columns
-│   ├── EXPECTED_OUTPUTS.md          # Expected files and key thesis metrics
-│   ├── DATA_ACQUISITION.md          # StockData.org and Google Trends collection
-│   ├── PREPROCESSING.md             # Preprocessing stages and commands
-│   ├── RAW_DATA_PIPELINE.md         # Raw-data reconstruction notes
-│   ├── REPRODUCIBILITY.md           # End-to-end reproduction guide
-│   └── SCRIPT_INDEX.md              # Active scripts and naming conventions
+├── data/                         # Local raw/intermediate/processed/model-feed data; not meant for normal commits
+├── docs/                         # Thesis workflow notes and command references
 ├── scripts/
-│   └── reproduce_windows.cmd        # Windows reproduction helper
+│   ├── run_stock_full_pipeline.sh # Generic end-to-end stock pipeline
+│   └── run_nvda_full_pipeline.sh  # NVDA convenience wrapper
 ├── src/thesis/
-│   ├── data_acquisition/            # StockData.org raw market/news downloads
-│   ├── preprocessing/               # Raw/intermediate-to-clean dataset pipeline
-│   ├── eval/                        # Reporting, baselines, tables and figures
-│   └── model_training/              # LSTM training and walk-forward evaluation
-├── tests/                           # Dataset-independent smoke tests
-├── .github/workflows/               # Lightweight CI smoke test
-├── requirements-reproducibility.txt # Reproducibility-oriented dependency snapshot
-├── .env.example                     # Local environment template
+│   ├── pipelines/                # Generic stock data pipeline wrappers
+│   ├── eval/                     # Reports, tables, figures and statistical evaluation
+│   └── model_training/           # Random search and walk-forward LSTM scripts
+├── requirements-reproducibility.txt
+├── .env.example
 ├── Makefile
 ├── pyproject.toml
 └── README.md
 ```
-
-## Active scripts
-
-| Purpose | Command |
-|---|---|
-| StockData.org downloads | `thesis-fetch-stockdata` |
-| Full preprocessing pipeline | `thesis-preprocess all` |
-| Dataset diagnostics | `python -m thesis.eval.make_scientific_outputs` |
-| Classical baselines | `python -m thesis.eval.run_baseline_models_linear_svm` |
-| Feature ablation | `python -m thesis.eval.run_baseline_models_linear_svm --run-ablations` |
-| LSTM tuning | `thesis-tune-lstm` |
-| LSTM walk-forward evaluation | `thesis-walkforward-lstm` |
-| Combined comparison table | `thesis-model-comparison` |
-
-## Reproducibility notes
-
-The classical benchmark models are deterministic or seeded and should reproduce closely given the same dataset and package versions. The LSTM training can vary slightly across runs because TensorFlow training is stochastic and can differ between CPU/GPU, operating systems and hardware.
-
-The final reported LSTM result in the thesis should be based on walk-forward out-of-sample predictions, not on random-search validation performance.
-
-The repository now includes a lightweight GitHub Actions smoke test that checks imports and public CLI entry points without requiring the dataset or API token.
