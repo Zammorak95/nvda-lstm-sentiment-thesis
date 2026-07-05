@@ -30,3 +30,9 @@ jobs:
           thesis-fetch-stockdata --help
           thesis-preprocess --help
           thesis-model-comparison --help
+
+      - name: Check generic full-pipeline shell entry point
+        run: |
+          ROOT="$PWD" PYTHON=python bash scripts/run_stock_full_pipeline.sh env
+          python src/thesis/pipelines/run_stock_pipeline.py --help
+          python src/thesis/pipelines/run_stock_pipeline_auto_window.py --help
