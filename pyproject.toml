@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "thesis"
 version = "0.1.0"
-description = "A structured Python project for a Master's thesis on LSTM-based intraday stock forecasting"
+description = "A structured Python project for a Master's thesis on LSTM-based stock-direction forecasting"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Sherick Burggraaff" }]
@@ -28,6 +28,9 @@ dependencies = [
   "jinja2>=3.1",
   "nltk>=3.8",
   "xlsxwriter>=3.2",
+  "tabulate>=0.9",
+  "statsmodels>=0.14",
+  "pytrends>=4.9.2",
 ]
 # TensorFlow is intentionally not listed as a hard dependency because installation
 # differs by OS and hardware. Install it separately when reproducing the LSTM runs:
