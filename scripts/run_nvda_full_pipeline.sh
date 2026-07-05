@@ -2,17 +2,20 @@
 set -euo pipefail
 
 # End-to-end NVIDIA thesis pipeline.
+#
+# Intended modelling logic:
+#   1) build the dataset
+#   2) build the reduced feature dataset used for the main model comparison
+#   3) run random search on the reduced dataset
+#   4) run walk-forward with the best random-search hyperparameters
+#   5) also run fixed-parameter full/reduced variants as comparison checks
+#   6) build cost-adjusted thesis reports and summary tables
+#
 # Usage examples:
 #   bash scripts/run_nvda_full_pipeline.sh data
 #   bash scripts/run_nvda_full_pipeline.sh reduced
-#   bash scripts/run_nvda_full_pipeline.sh walk_reduced
-#   bash scripts/run_nvda_full_pipeline.sh report_reduced
-#   bash scripts/run_nvda_full_pipeline.sh all
-#
-# Optional environment overrides:
-#   END=2026-03-01 bash scripts/run_nvda_full_pipeline.sh all
-#   NEWS_START=2020-01-01 END=2026-03-01 bash scripts/run_nvda_full_pipeline.sh data
-#   TRIALS=20 GPU=0 bash scripts/run_nvda_full_pipeline.sh random_search
+#   TRIALS=50 GPU=0 bash scripts/run_nvda_full_pipeline.sh random_bestparams
+#   END=2026-03-01 TRIALS=50 GPU=0 bash scripts/run_nvda_full_pipeline.sh all
 
 ROOT="${ROOT:-/home/zammorak/thesis}"
 PYTHON="${PYTHON:-$ROOT/.venv/bin/python}"
@@ -37,11 +40,11 @@ COST_BPS="${COST_BPS:-5}"
 
 DATASET="$ROOT/data/model_feed/nvda_model_dataset.csv"
 REDUCED_DATASET="$ROOT/data/model_feed/nvda_model_dataset_clean.csv"
-AUDIT="$ROOT/data/model_feed/nvda_model_dataset_audit.xlsx"
 
 FULL_OUT="$ROOT/artifacts/models/nvda_walk_forward_full_features"
 REDUCED_OUT="$ROOT/artifacts/models/nvda_walk_forward_reduced_features"
 RANDOM_OUT="$ROOT/artifacts/models/nvda_random_search_reduced_features"
+BEST_OUT="$ROOT/artifacts/models/nvda_walk_forward_random_search_bestparams"
 
 AUTO_PIPELINE="$ROOT/src/thesis/pipelines/run_stock_pipeline_auto_window.py"
 WALK_SCRIPT="$ROOT/src/thesis/model_training/optimalisation/walk_forward_lstm_direction_rocm.py"
@@ -93,6 +96,9 @@ phase_env() {
   echo "NEWS_START=$NEWS_START"
   echo "NEWS_LIMIT_PER_DAY=$NEWS_LIMIT_PER_DAY"
   echo "GPU=$GPU"
+  echo "TRIALS=$TRIALS"
+  echo "RANDOM_EPOCHS=$RANDOM_EPOCHS"
+  echo "WALK_EPOCHS=$WALK_EPOCHS"
   run "$PYTHON" --version
   require_file "$AUTO_PIPELINE"
   require_file "$WALK_SCRIPT"
@@ -170,6 +176,57 @@ phase_random_search() {
     --gpu "$GPU"
 }
 
+phase_walk_bestparams() {
+  require_file "$RANDOM_OUT/best/meta.json"
+  require_file "$REDUCED_DATASET"
+  run "$PYTHON" - <<PY
+import json
+import os
+import subprocess
+from pathlib import Path
+
+root = Path('$ROOT')
+python = Path('$PYTHON') if Path('$PYTHON').exists() else 'python3'
+meta_path = root / 'artifacts/models/nvda_random_search_reduced_features/best/meta.json'
+meta = json.loads(meta_path.read_text())
+params = meta['params']
+threshold = meta.get('threshold', 0.5)
+
+def s(key):
+    return str(params[key])
+
+cmd = [
+    str(python), '-u', str(root / 'src/thesis/model_training/optimalisation/walk_forward_lstm_direction_rocm.py'),
+    '--data', str(root / 'data/model_feed/nvda_model_dataset_clean.csv'),
+    '--outdir', str(root / 'artifacts/models/nvda_walk_forward_random_search_bestparams'),
+    '--lookback', s('lookback'),
+    '--initial_train', '700',
+    '--val_size', '126',
+    '--test_horizon', '63',
+    '--step', '63',
+    '--epochs', os.environ.get('WALK_EPOCHS', '30'),
+    '--batch', s('batch'),
+    '--lr', s('lr'),
+    '--lstm_units', s('lstm_units'),
+    '--dense_units', str(params.get('dense_units', 64)),
+    '--dropout', s('dropout'),
+    '--recurrent_dropout', s('recurrent_dropout'),
+    '--threshold', str(threshold),
+    '--gpu', os.environ.get('GPU', '0'),
+]
+print('Best random-search parameters:', params)
+print('Validation-selected threshold:', threshold)
+print('$ ' + ' '.join(cmd), flush=True)
+subprocess.run(cmd, check=True)
+PY
+}
+
+phase_random_bestparams() {
+  phase_random_search
+  phase_walk_bestparams
+  phase_report_bestparams
+}
+
 phase_walk_full() {
   require_file "$DATASET"
   run "$PYTHON" -u "$WALK_SCRIPT" \
@@ -230,6 +287,15 @@ phase_report_reduced() {
     --cost_bps "$COST_BPS"
 }
 
+phase_report_bestparams() {
+  require_file "$BEST_OUT/walk_forward_oos_predictions.csv"
+  run "$PYTHON" -u "$REPORT_SCRIPT" \
+    --oos "$BEST_OUT/walk_forward_oos_predictions.csv" \
+    --summary "$BEST_OUT/walk_forward_summary.json" \
+    --outdir "$BEST_OUT/thesis_report_cost_${COST_BPS}bps" \
+    --cost_bps "$COST_BPS"
+}
+
 phase_summary() {
   run "$PYTHON" - <<'PY'
 import json
@@ -238,15 +304,16 @@ import pandas as pd
 
 root = Path('/home/zammorak/thesis')
 items = {
-    'nvda_full_features': root / 'artifacts/models/nvda_walk_forward_full_features/walk_forward_summary.json',
-    'nvda_reduced_features': root / 'artifacts/models/nvda_walk_forward_reduced_features/walk_forward_summary.json',
-    'nvda_random_search_reduced': root / 'artifacts/models/nvda_random_search_reduced_features/best/meta.json',
+    'nvda_random_search_meta': root / 'artifacts/models/nvda_random_search_reduced_features/best/meta.json',
+    'nvda_walk_forward_random_search_bestparams': root / 'artifacts/models/nvda_walk_forward_random_search_bestparams/walk_forward_summary.json',
+    'nvda_reduced_fixed_params': root / 'artifacts/models/nvda_walk_forward_reduced_features/walk_forward_summary.json',
+    'nvda_full_fixed_params': root / 'artifacts/models/nvda_walk_forward_full_features/walk_forward_summary.json',
 }
 
 rows = []
 for name, path in items.items():
     if not path.exists():
-        rows.append({'run': name, 'path': str(path), 'status': 'missing'})
+        rows.append({'run': name, 'status': 'missing', 'path': str(path)})
         continue
     data = json.loads(path.read_text())
     if 'overall' in data:
@@ -254,24 +321,25 @@ for name, path in items.items():
         strat = overall.get('strategy', {}) or {}
         rows.append({
             'run': name,
-            'path': str(path),
             'status': 'ok',
             'auc': overall.get('auc'),
             'acc': overall.get('acc'),
             'sharpe': strat.get('sharpe_long_only'),
             'trade_rate': strat.get('trade_rate_long_only'),
             'feature_count': data.get('feature_count'),
+            'path': str(path),
         })
     else:
         rows.append({
             'run': name,
-            'path': str(path),
             'status': 'ok',
             'val_auc': data.get('val_auc'),
             'val_acc': data.get('val_acc'),
             'test_auc': data.get('test_auc'),
             'test_acc': data.get('test_acc'),
             'threshold': data.get('threshold'),
+            'params': json.dumps(data.get('params', {})),
+            'path': str(path),
         })
 
 out = pd.DataFrame(rows)
@@ -290,24 +358,33 @@ NVIDIA full thesis pipeline
 Usage:
   bash scripts/run_nvda_full_pipeline.sh <phase>
 
-Phases:
-  env             Check paths and Python
-  data            Fetch/process stock, news, trends; build dataset; validate; audit
-  reduced         Build reduced feature dataset
-  random_search   Run LSTM random search on reduced dataset
-  walk_full       Walk-forward LSTM on full feature dataset
-  walk_reduced    Walk-forward LSTM on reduced feature dataset
-  report_full     Build figures/tables/stat report for full walk-forward
-  report_reduced  Build figures/tables/stat report for reduced walk-forward
-  summary         Collect key metrics into one CSV
-  all             data -> reduced -> random_search -> walk_full -> walk_reduced -> reports -> summary
-  fast            reduced -> walk_reduced -> report_reduced -> summary
+Main phases:
+  env                 Check paths and Python
+  data                Fetch/process stock, news, trends; build dataset; validate; audit
+  reduced             Build reduced feature dataset
+  random_search       Run LSTM random search on reduced dataset
+  walk_bestparams     Run walk-forward using best random-search parameters
+  random_bestparams   random_search -> walk_bestparams -> report_bestparams
+  report_bestparams   Build report for best random-search walk-forward
+  summary             Collect key metrics into one CSV
+
+Comparison phases:
+  walk_full           Fixed-parameter walk-forward on full feature dataset
+  walk_reduced        Fixed-parameter walk-forward on reduced feature dataset
+  report_full         Report for fixed full-feature walk-forward
+  report_reduced      Report for fixed reduced-feature walk-forward
+
+Bundles:
+  all                 data -> reduced -> random_search -> walk_bestparams -> report_bestparams -> fixed comparison runs -> summary
+  model_main          random_search -> walk_bestparams -> report_bestparams -> summary
+  fixed_compare       walk_full -> walk_reduced -> report_full -> report_reduced -> summary
+  fast                reduced -> walk_reduced -> report_reduced -> summary
 
 Useful overrides:
-  END=2026-03-01 bash scripts/run_nvda_full_pipeline.sh all
+  END=2026-03-01 TRIALS=50 GPU=0 bash scripts/run_nvda_full_pipeline.sh all
+  TRIALS=20 GPU=0 bash scripts/run_nvda_full_pipeline.sh model_main
   NEWS_START=2020-01-01 END=2026-03-01 bash scripts/run_nvda_full_pipeline.sh data
-  TRIALS=20 GPU=0 bash scripts/run_nvda_full_pipeline.sh random_search
-  COST_BPS=5 bash scripts/run_nvda_full_pipeline.sh report_reduced
+  COST_BPS=5 bash scripts/run_nvda_full_pipeline.sh report_bestparams
 EOF
 }
 
@@ -316,15 +393,33 @@ case "$phase" in
   data) phase_data ;;
   reduced) phase_reduced ;;
   random_search) phase_random_search ;;
+  walk_bestparams) phase_walk_bestparams ;;
+  random_bestparams) phase_random_bestparams ;;
   walk_full) phase_walk_full ;;
   walk_reduced) phase_walk_reduced ;;
   report_full) phase_report_full ;;
   report_reduced) phase_report_reduced ;;
+  report_bestparams) phase_report_bestparams ;;
   summary) phase_summary ;;
   all)
     phase_data
     phase_reduced
     phase_random_search
+    phase_walk_bestparams
+    phase_report_bestparams
+    phase_walk_full
+    phase_walk_reduced
+    phase_report_full
+    phase_report_reduced
+    phase_summary
+    ;;
+  model_main)
+    phase_random_search
+    phase_walk_bestparams
+    phase_report_bestparams
+    phase_summary
+    ;;
+  fixed_compare)
     phase_walk_full
     phase_walk_reduced
     phase_report_full
