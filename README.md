@@ -105,7 +105,7 @@ KEYWORD                 Google Trends term, e.g. "NVIDIA stock" or "AMD stock"
 SCAN_START              Earliest date to test for news availability, default 2018-01-01
 END                     Final date for the data window; default is yesterday
 NEWS_START              auto or explicit YYYY-MM-DD
-NEWS_LIMIT_PER_DAY      StockData news limit per day, default 10
+NEWS_LIMIT_PER_DAY      StockData news articles requested per day; recommended 25 if your plan allows it
 MARKET_BUFFER_DAYS      Extra market/Trends history before news_start, default 45
 TRIALS                  Random-search trials, default 50
 RANDOM_EPOCHS           Max epochs per random-search trial, default 50
@@ -135,6 +135,13 @@ python -m pip install tensorflow statsmodels tabulate pytrends
 ```
 
 Set the StockData.org token locally as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_KEY`. Never commit tokens. Use `.env.example` as a template.
+
+Recommended local `.env` content:
+
+```text
+STOCKDATA_API_TOKEN=your_stockdata_token_here
+NEWS_LIMIT_PER_DAY=25
+```
 
 ## Project layout
 
