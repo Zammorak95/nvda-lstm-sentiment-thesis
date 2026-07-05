@@ -26,6 +26,16 @@ mlruns/
 *.joblib
 *.npy
 
+# old local dumps / accidental copied environments
+artifacts/sort/
+artifacts/models/OLD/
+
+# keep only the legacy index files in Git; keep bulky legacy outputs local
+artifacts/legacy/**
+!artifacts/legacy/
+!artifacts/legacy/README.md
+!artifacts/legacy/legacy_moves.csv
+
 # local/debug files
 misc/Error.txt
 .DS_Store
