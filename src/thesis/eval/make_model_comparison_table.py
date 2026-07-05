@@ -1,28 +1,12 @@
 #!/usr/bin/env python3
 """Create thesis-ready combined model-comparison tables.
 
-This script combines the classical benchmark results with the final LSTM
-walk-forward result and exports:
-- CSV table
-- Markdown table
-- LaTeX table
-- compact PNG table
-- separate classification and trading PNG tables
-- AUC bar chart
+Combines classical benchmark metrics with an LSTM walk-forward summary and exports
+CSV, Markdown, LaTeX and PNG tables plus an AUC bar chart.
 
-Typical command:
-    python -m thesis.eval.make_model_comparison_table \
-      --baseline-metrics artifacts/reports/baseline_models_linear_svm_ablations/tables/baseline_model_metrics.csv \
-      --lstm-summary artifacts/models/walk_forward_direction_bestparams/walk_forward_summary_best_features.json \
-      --outdir artifacts/reports/model_comparison
-
-If the LSTM summary file is unavailable, pass the LSTM values manually:
-    python -m thesis.eval.make_model_comparison_table \
-      --baseline-metrics artifacts/reports/baseline_models_linear_svm_ablations/tables/baseline_model_metrics.csv \
-      --lstm-auc 0.550643920654932 \
-      --lstm-accuracy 0.5178571428571429 \
-      --lstm-sharpe 0.9957887190041333 \
-      --lstm-trade-rate 0.5396825396825397
+The LSTM summary parser accepts both historical walk-forward summaries with an
+`overall` block and gross thesis report summaries with `classification` and
+`trading` blocks.
 """
 
 from __future__ import annotations
@@ -110,6 +94,29 @@ def first_existing(paths: list[Path]) -> Path | None:
     return None
 
 
+def as_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def first_value(mapping: dict[str, Any], keys: list[str]) -> float | None:
+    for key in keys:
+        if key in mapping:
+            val = as_float(mapping.get(key))
+            if val is not None:
+                return val
+    return None
+
+
+def update_if_missing(values: dict[str, float | None], key: str, candidate: float | None) -> None:
+    if values.get(key) is None and candidate is not None:
+        values[key] = candidate
+
+
 def parse_lstm_metrics(args: argparse.Namespace) -> dict[str, float | None]:
     """Read LSTM metrics from a summary JSON or manual CLI values."""
     values: dict[str, float | None] = {
@@ -148,53 +155,48 @@ def parse_lstm_metrics(args: argparse.Namespace) -> dict[str, float | None]:
 
     if summary_path is not None and summary_path.exists():
         summary = read_json(summary_path)
-        key_map = {
-            "auc": ["overall_oos_auc", "overall_auc", "oos_auc", "auc"],
-            "accuracy": [
-                "overall_oos_acc",
-                "overall_oos_accuracy",
-                "overall_acc",
-                "oos_acc",
-                "accuracy",
-            ],
-            "balanced_accuracy": ["balanced_accuracy", "overall_balanced_accuracy"],
-            "strategy_sharpe": [
-                "strategy_sharpe",
-                "oos_sharpe_long_only",
-                "sharpe",
-                "sharpe_long_only",
-            ],
-            "trade_rate": ["trade_rate", "oos_trade_rate"],
-            "max_drawdown": ["max_drawdown", "strategy_max_drawdown"],
-        }
-        for out_key, candidates in key_map.items():
-            if values[out_key] is not None:
-                continue
-            for key in candidates:
-                if key in summary and summary[key] is not None:
-                    try:
-                        values[out_key] = float(summary[key])
-                        break
-                    except (TypeError, ValueError):
-                        continue
+
+        update_if_missing(values, "auc", first_value(summary, ["overall_oos_auc", "overall_auc", "oos_auc", "auc"]))
+        update_if_missing(
+            values,
+            "accuracy",
+            first_value(summary, ["overall_oos_acc", "overall_oos_accuracy", "overall_acc", "oos_acc", "accuracy", "acc"]),
+        )
+        update_if_missing(values, "balanced_accuracy", first_value(summary, ["balanced_accuracy", "overall_balanced_accuracy"]))
+        update_if_missing(values, "strategy_sharpe", first_value(summary, ["strategy_sharpe", "oos_sharpe_long_only", "sharpe", "sharpe_long_only"]))
+        update_if_missing(values, "trade_rate", first_value(summary, ["trade_rate", "oos_trade_rate"]))
+        update_if_missing(values, "max_drawdown", first_value(summary, ["max_drawdown", "strategy_max_drawdown"]))
+
+        # Historical walk-forward summary shape: {"overall": {"auc", "acc", "strategy": {...}}}
+        overall = summary.get("overall", {})
+        if isinstance(overall, dict):
+            update_if_missing(values, "auc", first_value(overall, ["auc", "oos_auc", "overall_auc"]))
+            update_if_missing(values, "accuracy", first_value(overall, ["acc", "accuracy", "oos_acc"]))
+            update_if_missing(values, "balanced_accuracy", first_value(overall, ["balanced_accuracy"]))
+            strategy = overall.get("strategy", {})
+            if isinstance(strategy, dict):
+                update_if_missing(values, "strategy_sharpe", first_value(strategy, ["sharpe_long_only", "sharpe", "strategy_sharpe"]))
+                update_if_missing(values, "trade_rate", first_value(strategy, ["trade_rate_long_only", "trade_rate"]))
+                update_if_missing(values, "max_drawdown", first_value(strategy, ["max_drawdown_long_only", "max_drawdown"]))
+
+        # Gross thesis report shape: {"classification": {...}, "trading": {...}}
+        classification = summary.get("classification", {})
+        if isinstance(classification, dict):
+            update_if_missing(values, "auc", first_value(classification, ["oos_auc", "auc"]))
+            update_if_missing(values, "accuracy", first_value(classification, ["oos_acc", "accuracy", "acc"]))
+            update_if_missing(values, "trade_rate", first_value(classification, ["trade_rate"]))
+            update_if_missing(values, "balanced_accuracy", first_value(classification, ["balanced_accuracy"]))
+
+        trading = summary.get("trading", {})
+        if isinstance(trading, dict):
+            update_if_missing(values, "strategy_sharpe", first_value(trading, ["annualized_sharpe", "sharpe", "strategy_sharpe"]))
+            update_if_missing(values, "max_drawdown", first_value(trading, ["max_drawdown"]))
 
         strategy = summary.get("strategy") or summary.get("strategy_metrics") or {}
         if isinstance(strategy, dict):
-            if values["strategy_sharpe"] is None:
-                for key in ["sharpe", "strategy_sharpe", "oos_sharpe_long_only"]:
-                    if key in strategy and strategy[key] is not None:
-                        values["strategy_sharpe"] = float(strategy[key])
-                        break
-            if values["trade_rate"] is None:
-                for key in ["trade_rate", "oos_trade_rate"]:
-                    if key in strategy and strategy[key] is not None:
-                        values["trade_rate"] = float(strategy[key])
-                        break
-            if values["max_drawdown"] is None:
-                for key in ["max_drawdown", "strategy_max_drawdown"]:
-                    if key in strategy and strategy[key] is not None:
-                        values["max_drawdown"] = float(strategy[key])
-                        break
+            update_if_missing(values, "strategy_sharpe", first_value(strategy, ["sharpe", "strategy_sharpe", "oos_sharpe_long_only", "sharpe_long_only"]))
+            update_if_missing(values, "trade_rate", first_value(strategy, ["trade_rate", "oos_trade_rate", "trade_rate_long_only"]))
+            update_if_missing(values, "max_drawdown", first_value(strategy, ["max_drawdown", "strategy_max_drawdown"]))
 
     missing_core = [k for k in ["auc", "accuracy"] if values[k] is None]
     if missing_core:
@@ -282,9 +284,7 @@ def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
 def wrap_text_columns(display: pd.DataFrame) -> pd.DataFrame:
     wrapped = display.copy()
     if "Model" in wrapped.columns:
-        wrapped["Model"] = wrapped["Model"].replace(
-            {"LSTM (best specification)": "LSTM\n(best spec.)"}
-        )
+        wrapped["Model"] = wrapped["Model"].replace({"LSTM (best specification)": "LSTM\n(best spec.)"})
     if "Role" in wrapped.columns:
         wrapped["Role"] = wrapped["Role"].apply(lambda x: fill(str(x), width=18))
     return wrapped
@@ -324,9 +324,7 @@ def write_outputs(df: pd.DataFrame, outdir: Path) -> None:
         header_fontsize=8.8,
     )
 
-    classification = compact_headers(
-        wrap_text_columns(display[["Model", "Role", "OOS AUC", "OOS accuracy", "Balanced accuracy"]])
-    )
+    classification = compact_headers(wrap_text_columns(display[["Model", "Role", "OOS AUC", "OOS accuracy", "Balanced accuracy"]]))
     make_table_png(
         classification,
         outdir / "model_comparison_classification_table.png",
@@ -338,9 +336,7 @@ def write_outputs(df: pd.DataFrame, outdir: Path) -> None:
         header_fontsize=9.2,
     )
 
-    trading = compact_headers(
-        wrap_text_columns(display[["Model", "Strategy Sharpe", "Trade rate", "Max drawdown"]])
-    )
+    trading = compact_headers(wrap_text_columns(display[["Model", "Strategy Sharpe", "Trade rate", "Max drawdown"]]))
     make_table_png(
         trading,
         outdir / "model_comparison_trading_table.png",
