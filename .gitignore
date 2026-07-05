@@ -31,3 +31,21 @@ misc/Error.txt
 .DS_Store
 Thumbs.db
 src/*.egg-info/
+
+# Local/editor files
+.vscode/
+
+# Local thesis working artifacts
+Prompt_explain.txt
+artifacts/
+final_results/
+misc/
+notebooks/
+*.save
+
+# Local result collection scripts/reports
+collect_all_results.py
+collect_thesis_results.py
+generate_results_summary.py
+thesis_results_report.txt
+thesis_results_table.csv
