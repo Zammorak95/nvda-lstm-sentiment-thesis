@@ -1,0 +1,8 @@
+run,status,path,val_auc,val_acc,test_auc,test_acc,threshold,params,auc,acc,sharpe,trade_rate,feature_count,max_drawdown,mean_daily_return,num_trades
+amd_random_search_meta,ok,/home/zammorak/thesis/artifacts/models/amd_random_search_reduced_features/best/meta.json,0.6388608870967742,0.6190476190476191,0.5163799645838604,0.47619047619047616,0.49999999999999994,"{""lookback"": 105, ""lstm_units"": 96, ""dense_units"": 64, ""dropout"": 0.02, ""recurrent_dropout"": 0.15, ""lr"": 0.0002, ""batch"": 64}",,,,,,,,
+amd_walk_forward_bestparams,ok,/home/zammorak/thesis/artifacts/models/amd_walk_forward_random_search_bestparams/walk_forward_summary.json,,,,,,,0.4760446237362419,0.49029982363315694,0.6180542870138431,0.6455026455026455,16.0,,,
+amd_walk_forward_bestparams_report,ok,/home/zammorak/thesis/artifacts/models/amd_walk_forward_random_search_bestparams/thesis_report_gross/report_summary.json,,,,,,,0.4760446237362419,0.49029982363315694,0.6180542870138431,0.6455026455026455,,-0.5723690722362202,0.0010929892404424478,366.0
+amd_legacy_05506_params,missing,/home/zammorak/thesis/artifacts/models/amd_walk_forward_legacy_05506_params/walk_forward_summary.json,,,,,,,,,,,,,,
+amd_legacy_05506_report,missing,/home/zammorak/thesis/artifacts/models/amd_walk_forward_legacy_05506_params/thesis_report_gross/report_summary.json,,,,,,,,,,,,,,
+amd_fixed_reduced,missing,/home/zammorak/thesis/artifacts/models/amd_walk_forward_reduced_fixedparams/walk_forward_summary.json,,,,,,,,,,,,,,
+amd_fixed_full,missing,/home/zammorak/thesis/artifacts/models/amd_walk_forward_full_fixedparams/walk_forward_summary.json,,,,,,,,,,,,,,

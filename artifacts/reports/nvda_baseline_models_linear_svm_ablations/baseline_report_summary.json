@@ -1,0 +1,242 @@
+{
+  "dataset": "/home/zammorak/thesis/data/model_feed/nvda_model_dataset_clean.csv",
+  "outdir": "/home/zammorak/thesis/artifacts/reports/nvda_baseline_models_linear_svm_ablations",
+  "feature_sets": {
+    "all_features": [
+      "log_return",
+      "overnight_return",
+      "momentum_5d",
+      "momentum_20d",
+      "volatility_20d",
+      "volume_change",
+      "volume_20d_avg",
+      "avg_sentiment",
+      "sentiment_std",
+      "news_count",
+      "spy_return",
+      "soxx_return",
+      "ief_return",
+      "trends_zscore_30d",
+      "trends_momentum_7d",
+      "trends_spike"
+    ],
+    "market_only": [
+      "log_return",
+      "overnight_return",
+      "momentum_5d",
+      "momentum_20d",
+      "volatility_20d",
+      "volume_change",
+      "volume_20d_avg"
+    ],
+    "market_macro": [
+      "log_return",
+      "overnight_return",
+      "momentum_5d",
+      "momentum_20d",
+      "volatility_20d",
+      "volume_change",
+      "volume_20d_avg",
+      "spy_return",
+      "soxx_return",
+      "ief_return"
+    ],
+    "alternative_only": [
+      "avg_sentiment",
+      "sentiment_std",
+      "news_count",
+      "trends_zscore_30d",
+      "trends_momentum_7d",
+      "trends_spike"
+    ],
+    "no_alternative_data": [
+      "log_return",
+      "overnight_return",
+      "momentum_5d",
+      "momentum_20d",
+      "volatility_20d",
+      "volume_change",
+      "volume_20d_avg",
+      "spy_return",
+      "soxx_return",
+      "ief_return"
+    ],
+    "sentiment_only": [
+      "avg_sentiment",
+      "sentiment_std",
+      "news_count"
+    ],
+    "attention_only": [
+      "trends_zscore_30d",
+      "trends_momentum_7d",
+      "trends_spike"
+    ]
+  },
+  "models": [
+    "majority_class",
+    "logistic_regression",
+    "random_forest",
+    "svm_linear"
+  ],
+  "walk_forward": {
+    "initial_train": 700,
+    "val_size": 126,
+    "test_horizon": 63,
+    "step": 63
+  },
+  "best_by_auc": [
+    {
+      "observations": 567,
+      "auc": 0.5447158562048753,
+      "accuracy": 0.4673721340388007,
+      "balanced_accuracy": 0.4893713365701492,
+      "precision": 0.5337423312883436,
+      "recall": 0.2779552715654952,
+      "f1": 0.36554621848739494,
+      "brier": NaN,
+      "trade_rate": 0.2874779541446208,
+      "mean_strategy_return": -0.00038621586925867733,
+      "strategy_sharpe": -0.40311658417542484,
+      "max_drawdown": -0.5176792391053439,
+      "accuracy_binom_pvalue_vs_0p50": 0.944779366134138,
+      "strategy_mean_ttest_pvalue_gt_0": 0.7270041518824866,
+      "strategy_mean_permutation_pvalue": 0.9820359281437125,
+      "confusion_matrix_tn_fp_fn_tp": [
+        [
+          178,
+          76
+        ],
+        [
+          226,
+          87
+        ]
+      ],
+      "feature_set": "no_alternative_data",
+      "model": "svm_linear"
+    },
+    {
+      "observations": 567,
+      "auc": 0.5447158562048753,
+      "accuracy": 0.4673721340388007,
+      "balanced_accuracy": 0.4893713365701492,
+      "precision": 0.5337423312883436,
+      "recall": 0.2779552715654952,
+      "f1": 0.36554621848739494,
+      "brier": NaN,
+      "trade_rate": 0.2874779541446208,
+      "mean_strategy_return": -0.00038621586925867733,
+      "strategy_sharpe": -0.40311658417542484,
+      "max_drawdown": -0.5176792391053439,
+      "accuracy_binom_pvalue_vs_0p50": 0.944779366134138,
+      "strategy_mean_ttest_pvalue_gt_0": 0.7270041518824866,
+      "strategy_mean_permutation_pvalue": 0.9820359281437125,
+      "confusion_matrix_tn_fp_fn_tp": [
+        [
+          178,
+          76
+        ],
+        [
+          226,
+          87
+        ]
+      ],
+      "feature_set": "market_macro",
+      "model": "svm_linear"
+    },
+    {
+      "observations": 567,
+      "auc": 0.5410304143291993,
+      "accuracy": 0.49206349206349204,
+      "balanced_accuracy": 0.5002326985484642,
+      "precision": 0.5523012552301255,
+      "recall": 0.4217252396166134,
+      "f1": 0.4782608695652174,
+      "brier": 0.2487791198050462,
+      "trade_rate": 0.42151675485008816,
+      "mean_strategy_return": 0.0016515729349100652,
+      "strategy_sharpe": 1.3344640769334908,
+      "max_drawdown": -0.24909501802516398,
+      "accuracy_binom_pvalue_vs_0p50": 0.6627242273853559,
+      "strategy_mean_ttest_pvalue_gt_0": 0.022992588729000774,
+      "strategy_mean_permutation_pvalue": 0.2215568862275449,
+      "confusion_matrix_tn_fp_fn_tp": [
+        [
+          147,
+          107
+        ],
+        [
+          181,
+          132
+        ]
+      ],
+      "feature_set": "market_only",
+      "model": "random_forest"
+    },
+    {
+      "observations": 567,
+      "auc": 0.5402757163341803,
+      "accuracy": 0.5167548500881834,
+      "balanced_accuracy": 0.5263075142763705,
+      "precision": 0.5836909871244635,
+      "recall": 0.43450479233226835,
+      "f1": 0.4981684981684982,
+      "brier": 0.24842731101643914,
+      "trade_rate": 0.4109347442680776,
+      "mean_strategy_return": 0.0014908287961599976,
+      "strategy_sharpe": 1.167526680654918,
+      "max_drawdown": -0.24968597940474702,
+      "accuracy_binom_pvalue_vs_0p50": 0.22486025859817102,
+      "strategy_mean_ttest_pvalue_gt_0": 0.04035212176003172,
+      "strategy_mean_permutation_pvalue": 0.2554890219560878,
+      "confusion_matrix_tn_fp_fn_tp": [
+        [
+          157,
+          97
+        ],
+        [
+          177,
+          136
+        ]
+      ],
+      "feature_set": "market_macro",
+      "model": "random_forest"
+    },
+    {
+      "observations": 567,
+      "auc": 0.5402757163341803,
+      "accuracy": 0.5167548500881834,
+      "balanced_accuracy": 0.5263075142763705,
+      "precision": 0.5836909871244635,
+      "recall": 0.43450479233226835,
+      "f1": 0.4981684981684982,
+      "brier": 0.24842731101643914,
+      "trade_rate": 0.4109347442680776,
+      "mean_strategy_return": 0.0014908287961599976,
+      "strategy_sharpe": 1.167526680654918,
+      "max_drawdown": -0.24968597940474702,
+      "accuracy_binom_pvalue_vs_0p50": 0.22486025859817102,
+      "strategy_mean_ttest_pvalue_gt_0": 0.04035212176003172,
+      "strategy_mean_permutation_pvalue": 0.2554890219560878,
+      "confusion_matrix_tn_fp_fn_tp": [
+        [
+          157,
+          97
+        ],
+        [
+          177,
+          136
+        ]
+      ],
+      "feature_set": "no_alternative_data",
+      "model": "random_forest"
+    }
+  ],
+  "figures": [
+    "/home/zammorak/thesis/artifacts/reports/nvda_baseline_models_linear_svm_ablations/figures/baseline_model_auc.png",
+    "/home/zammorak/thesis/artifacts/reports/nvda_baseline_models_linear_svm_ablations/figures/baseline_model_accuracy.png",
+    "/home/zammorak/thesis/artifacts/reports/nvda_baseline_models_linear_svm_ablations/figures/baseline_model_sharpe.png",
+    "/home/zammorak/thesis/artifacts/reports/nvda_baseline_models_linear_svm_ablations/figures/baseline_cumulative_returns.png",
+    "/home/zammorak/thesis/artifacts/reports/nvda_baseline_models_linear_svm_ablations/figures/feature_set_ablation_auc.png",
+    "/home/zammorak/thesis/artifacts/reports/nvda_baseline_models_linear_svm_ablations/figures/random_forest_feature_importance.png"
+  ]
+}

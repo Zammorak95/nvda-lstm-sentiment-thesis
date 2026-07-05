@@ -1,0 +1,5 @@
+group,expected_features,present_features,features
+market,7,7,"log_return, overnight_return, momentum_5d, momentum_20d, volatility_20d, volume_change, volume_20d_avg"
+macro_sector_bond,3,3,"spy_return, soxx_return, ief_return"
+sentiment,3,3,"avg_sentiment, sentiment_std, news_count"
+attention,3,3,"trends_zscore_30d, trends_momentum_7d, trends_spike"
