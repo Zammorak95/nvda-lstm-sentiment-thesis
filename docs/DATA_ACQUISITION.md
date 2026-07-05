@@ -1,160 +1,95 @@
 # Raw-data acquisition
 
-This page documents how the raw market and news data were obtained before preprocessing.
+This page documents how the raw market, news and Google Trends data are obtained before preprocessing.
 
-The canonical command is:
+The active generic entry point is:
 
-```cmd
-thesis-fetch-stockdata --help
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 \
+  bash scripts/run_stock_full_pipeline.sh data
 ```
 
-The canonical source file is:
+## StockData.org market data
+
+The data phase downloads EOD OHLCV data for the target ticker and macro/market proxies:
 
 ```text
-src/thesis/data_acquisition/stockdata_api.py
+Target ticker: SYMBOL, e.g. NVDA or AMD
+Market proxy: SPY
+Sector proxy: SOXX
+Bond/rate proxy: IEF
 ```
 
-It replaces the older loose script `nvda_stockdata_fetch_combined.py` as the documented entry point for StockData.org downloads.
+If raw or processed files already exist, they are reused unless `FORCE=1` is set.
 
-## Authentication
+## StockData.org news headlines
 
-Create a local `.env` file or set an environment variable manually. Do not commit API keys.
-
-Windows CMD:
-
-```cmd
-set STOCKDATA_API_TOKEN=your_token_here
-```
-
-PowerShell:
-
-```powershell
-$env:STOCKDATA_API_TOKEN="your_token_here"
-```
-
-The command also accepts `STOCKDATA_API_KEY`.
-
-## Market data from StockData.org
-
-### NVDA EOD data
-
-```cmd
-thesis-fetch-stockdata market ^
-  --mode eod ^
-  --symbol NVDA ^
-  --start 2019-03-01 ^
-  --end 2026-03-01 ^
-  --csv
-```
-
-Default output:
+The pipeline uses StockData.org symbol-filtered news headlines. When `NEWS_START=auto`, the pipeline first tries to infer the earliest local news date. If no local news files exist, it performs an API-conscious hierarchical scan:
 
 ```text
-data/raw/stock_data/NVDA/NVDA_eod_2019-03-01_to_2026-03-01.parquet
-data/raw/stock_data/NVDA/NVDA_eod_2019-03-01_to_2026-03-01.csv
+year probes -> month probes -> day probes
 ```
 
-### Macro/market proxy EOD data
+After the news start is resolved, news is fetched day by day and written into monthly checkpoint CSV files. The default per-day article limit is:
 
-```cmd
-thesis-fetch-stockdata market --mode eod --symbol SPY  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
-thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
-thesis-fetch-stockdata market --mode eod --symbol IEF  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
+```bash
+NEWS_LIMIT_PER_DAY=25
 ```
 
-### Intraday data
+## Google Trends through PyTrends
 
-The thesis later uses a daily modelling dataset, but intraday data can be downloaded if needed:
+Google Trends is now collected through PyTrends inside the generic pipeline.
 
-```cmd
-thesis-fetch-stockdata market ^
-  --mode intraday ^
-  --symbol NVDA ^
-  --start 2024-01-01 ^
-  --end 2024-02-01 ^
-  --interval minute ^
-  --chunk-days 7 ^
-  --csv
+The process is:
+
+1. Fetch one full-period reference series for `KEYWORD`.
+2. Fetch smaller daily chunks over the same period.
+3. Scale the daily chunks to the full-period reference.
+4. Chain-link adjacent chunks to reduce artificial jumps.
+5. Interpolate to a continuous daily series.
+6. Build attention features such as z-score, 7-day momentum and spike indicators.
+
+The main command is:
+
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 \
+  bash scripts/run_stock_full_pipeline.sh data
 ```
 
-## News headlines from StockData.org
-
-```cmd
-thesis-fetch-stockdata news ^
-  --symbols NVDA ^
-  --start 2019-03-01 ^
-  --end 2026-03-01 ^
-  --chunk-days 30 ^
-  --csv
-```
-
-Default output:
+Useful Google Trends settings:
 
 ```text
-data/raw/news_headlines/NVDA_news_2019-03-01_to_2026-03-01.parquet
-data/raw/news_headlines/NVDA_news_2019-03-01_to_2026-03-01.csv
+KEYWORD                 Google Trends search term
+trends_geo              Empty by default; set in code/CLI if needed
+trends_gprop            Empty by default; web search interest
+trends_chunk_days       90 days by default
+trends_sleep_min/max    Polite waiting between requests
 ```
 
-The news command has a configurable endpoint:
-
-```cmd
-thesis-fetch-stockdata news --url <endpoint> --param key=value
-```
-
-Use this if StockData.org changes the news endpoint or requires additional query parameters for your subscription.
-
-## Google Trends data
-
-Google Trends data were collected manually because Google Trends does not provide a stable official bulk-download API for this exact workflow.
-
-Recommended manual collection process:
-
-1. Go to Google Trends.
-2. Search for `Nvidia` or the exact query used in the thesis.
-3. Set geography and category consistently. Document the choice, for example worldwide search interest.
-4. Download one full-period monthly series. Save it as:
-
-```text
-data/raw/trends/multiTimeline.csv
-```
-
-5. Download smaller overlapping daily windows. Google Trends gives daily resolution for shorter time windows. Save them as:
-
-```text
-data/raw/trends/multiTimeline(1).csv
-data/raw/trends/multiTimeline(2).csv
-data/raw/trends/multiTimeline(3).csv
-...
-```
-
-6. Run:
-
-```cmd
-thesis-preprocess trends-reconstruct
-thesis-preprocess trends-clean
-```
-
-The preprocessing step uses the monthly series as a global scale anchor and rescales the daily chunks into a consistent daily attention series.
+The implementation is intentionally conservative: it uses retries, checkpoint files and polite waits, but it does not rotate proxies or fake identities.
 
 ## Raw-to-clean sequence
 
-After all raw files are present:
+Full data construction route:
 
-```cmd
-thesis-preprocess all
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 bash scripts/run_stock_full_pipeline.sh data
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh reduced
 ```
 
 This produces:
 
 ```text
-data/model_feed/model_dataset.csv
-data/model_feed/model_dataset_clean.csv
-data/model_feed/model_dataset_audit.xlsx
+data/model_feed/nvda_model_dataset.csv
+data/model_feed/nvda_model_dataset_clean.csv
+data/model_feed/nvda_model_dataset_audit.xlsx
 ```
 
-## Important notes
+For AMD, replace `SYMBOL=NVDA` and `KEYWORD="NVIDIA stock"` with the AMD values.
 
-- API keys must never be committed to GitHub.
-- Raw data are ignored by Git by default.
-- Raw news and market data may be subject to licensing restrictions.
-- Google Trends exports should be documented carefully because export timing and query settings can affect the resulting series.
+## Practical notes
+
+- Raw generated files are checkpointed and reused by default.
+- Use `FORCE=1` only when you intentionally want to refetch or rebuild.
+- Google Trends values can depend on keyword, geography, time window and collection timing.
+- Keep local credentials in `.env`; use `.env.example` as the template.
