@@ -1,24 +1,20 @@
 #!/usr/bin/env python3
-"""
-Random search hyperparameter optimization for a ROCm-safe LSTM direction classifier.
+"""Random search hyperparameter optimization for a ROCm-safe LSTM direction classifier.
 
 What it does
 - Loads the clean thesis model dataset.
 - Uses a chronological train | validation | test split.
 - Scales using TRAIN ONLY to avoid look-ahead leakage.
-- Randomly samples LSTM hyperparameters from a narrowed search space.
+- Randomly samples LSTM hyperparameters from the thesis search space.
 - Trains with EarlyStopping on validation AUC.
 - Optionally selects a decision threshold on validation using Youden's J.
 - Saves every trial to CSV and the best model/scaler/meta to outdir/best/.
 - Evaluates the best validation model on the untouched TEST split.
 
-Windows/Linux paths
-- Defaults are built from thesis.paths, so they work on Windows, Linux, and macOS.
-- Override with --data, --outdir, THESIS_DATA_DIR, THESIS_ARTIFACTS_DIR, or THESIS_MODELS_DIR.
-
-GPU/ROCm
-- --gpu sets HIP_VISIBLE_DEVICES before TensorFlow is imported.
-- This matters because TensorFlow reads GPU visibility at import time.
+The search space intentionally includes 96 LSTM units because the historical NVDA
+thesis run that produced an OOS AUC of approximately 0.5506 used 96 units. This
+keeps the generic pipeline capable of rediscovering or approximating that earlier
+specification when the same dataset and environment are used.
 """
 
 from __future__ import annotations
@@ -87,7 +83,7 @@ def make_sequences(X: np.ndarray, y: np.ndarray, lookback: int) -> tuple[np.ndar
     Xs: list[np.ndarray] = []
     ys: list[int] = []
     for i in range(lookback, len(X)):
-        Xs.append(X[i - lookback:i])
+        Xs.append(X[i - lookback : i])
         ys.append(int(y[i]))
     return np.asarray(Xs, dtype=np.float32), np.asarray(ys, dtype=np.int32)
 
@@ -183,7 +179,7 @@ class TrialResult:
 def sample_params(rng: random.Random) -> dict[str, Any]:
     return {
         "lookback": rng.choice([45, 60, 75, 90, 105]),
-        "lstm_units": rng.choice([16, 32, 48, 64]),
+        "lstm_units": rng.choice([16, 32, 48, 64, 96]),
         "dense_units": rng.choice([16, 32, 64]),
         "dropout": rng.choice([0.02, 0.05, 0.08, 0.10]),
         "recurrent_dropout": rng.choice([0.15, 0.20, 0.25]),
@@ -378,8 +374,8 @@ def main() -> None:
 
     lb = int(best_payload["params"]["lookback"])
     X_seq, y_seq = make_sequences(X_scaled_full, y_all, lb)
-    X_test = X_seq[test_start - lb:]
-    y_test = y_seq[test_start - lb:]
+    X_test = X_seq[test_start - lb :]
+    y_test = y_seq[test_start - lb :]
 
     best_model = tf.keras.models.load_model(best_dir / "model.keras")
     test_prob = best_model.predict(X_test, verbose=0).reshape(-1)
