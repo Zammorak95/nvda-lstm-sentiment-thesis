@@ -1,25 +1,26 @@
 # Dataset schema
 
-The final modelling dataset is expected at:
+The generic pipeline writes ticker-specific clean modelling datasets, for example:
 
 ```text
-data/model_feed/model_dataset_clean.csv
+data/model_feed/nvda_model_dataset_clean.csv
+data/model_feed/amd_model_dataset_clean.csv
 ```
 
-It is a chronological daily dataset used by both the classical benchmarks and the LSTM walk-forward evaluation.
+Each file is a chronological daily dataset used by both the classical benchmarks and the LSTM walk-forward evaluation.
 
 ## Required columns
 
 | Column | Type | Description |
 |---|---|---|
 | `date` | date | Trading date. |
-| `target_next_return` | float | Next-day NVDA log return; used for trading-oriented metrics. |
+| `target_next_return` | float | Next-day target-stock log return; used for trading-oriented metrics. |
 | `target_direction` | integer | Direction target: `1` for positive next-day return, `0` otherwise. |
-| `log_return` | float | Current-day NVDA log return. |
+| `log_return` | float | Current-day target-stock log return. |
 | `overnight_return` | float | Return from previous close to current open. |
-| `momentum_5d` | float | Five-day rolling mean of NVDA log returns. |
-| `momentum_20d` | float | Twenty-day rolling mean of NVDA log returns. |
-| `volatility_20d` | float | Twenty-day rolling standard deviation of NVDA log returns. |
+| `momentum_5d` | float | Five-day rolling mean of target-stock log returns. |
+| `momentum_20d` | float | Twenty-day rolling mean of target-stock log returns. |
+| `volatility_20d` | float | Twenty-day rolling standard deviation of target-stock log returns. |
 | `volume_change` | float | Percentage change in daily volume. |
 | `volume_20d_avg` | float | Twenty-day rolling average of volume. |
 | `spy_return` | float | SPY log return as broad market proxy. |
@@ -34,11 +35,16 @@ It is a chronological daily dataset used by both the classical benchmarks and th
 
 ## Validation checks
 
-Run:
+The generic pipeline writes an audit workbook automatically:
 
-```cmd
-thesis-preprocess validate --input data\model_feed\model_dataset_clean.csv
-thesis-preprocess audit --input data\model_feed\model_dataset_clean.csv --output data\model_feed\model_dataset_audit.xlsx
+```text
+data/model_feed/nvda_model_dataset_audit.xlsx
+```
+
+A direct validation run can also be executed with:
+
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 bash scripts/run_stock_full_pipeline.sh data
 ```
 
 The validation step checks basic dataset shape, date range, duplicate dates, large date gaps, missing values, zero-variance columns and target correlations.
@@ -49,3 +55,4 @@ The validation step checks basic dataset shape, date range, duplicate dates, lar
 - The evaluation pipeline uses strictly chronological train/validation/test splits.
 - `target_direction` is the classification target.
 - `target_next_return` is not a model feature; it is used to evaluate trading-oriented performance.
+- The clean dataset contains 16 feature columns plus date and target columns.
