@@ -4,182 +4,156 @@ This document lists the canonical commands for reproducing the thesis workflow. 
 
 ## 1. Environment
 
-### Windows CMD
-
-```cmd
-python -m venv .venv
-.venv\Scripts\activate.bat
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e ".[dev]"
+python -m pip install tensorflow
+```
+
+For a pinned non-TensorFlow environment:
+
+```bash
+python -m pip install -r requirements-reproducibility.txt
 python -m pip install -e ".[dev]"
 ```
 
-Install TensorFlow only when reproducing the LSTM runs:
+TensorFlow is kept separate because installation differs by OS/GPU.
 
-```cmd
-python -m pip install tensorflow statsmodels tabulate
+## 2. Main generic end-to-end pipeline
+
+Check configuration:
+
+```bash
+ROOT=$PWD PYTHON=python bash scripts/run_stock_full_pipeline.sh env
 ```
 
-## 2. Raw-data acquisition
+Run the main NVIDIA thesis pipeline:
 
-Set your StockData.org token locally as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_KEY`. Do not commit tokens.
-
-Show available acquisition commands:
-
-```cmd
-thesis-fetch-stockdata --help
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 TRIALS=50 GPU=0 \
+  bash scripts/run_stock_full_pipeline.sh main
 ```
 
-Download market/news data:
+Run the full NVIDIA pipeline including fixed comparison runs:
 
-```cmd
-thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
-thesis-fetch-stockdata market --mode eod --symbol SPY  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
-thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
-thesis-fetch-stockdata market --mode eod --symbol IEF  --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
-thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 TRIALS=50 GPU=0 \
+  bash scripts/run_stock_full_pipeline.sh all
 ```
 
-Google Trends is downloaded manually from the Google Trends website. Save one full-period monthly export plus smaller daily-window exports in:
+Run the AMD robustness pipeline:
+
+```bash
+SYMBOL=AMD KEYWORD="AMD stock" END=2026-02-26 TRIALS=50 GPU=0 \
+  bash scripts/run_stock_full_pipeline.sh all
+```
+
+Main route:
 
 ```text
-data/raw/trends/
+data -> reduced -> random_search -> walk_bestparams -> report_bestparams -> baselines -> model_comparison -> summary
 ```
 
-See `docs/DATA_ACQUISITION.md` for the full process.
+## 3. Pipeline phases
 
-## 3. Raw/intermediate data location
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 bash scripts/run_stock_full_pipeline.sh data
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh reduced
+SYMBOL=NVDA KEYWORD="NVIDIA stock" TRIALS=50 GPU=0 bash scripts/run_stock_full_pipeline.sh random_search
+SYMBOL=NVDA KEYWORD="NVIDIA stock" GPU=0 bash scripts/run_stock_full_pipeline.sh walk_bestparams
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh report_bestparams
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh baselines
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh model_comparison
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh summary
+```
 
-Default raw-data locations:
+## 4. Historical NVDA 0.5506-style check
+
+The old thesis result around OOS AUC `0.5506` came from this specification:
 
 ```text
-data/raw/news_headlines/
-data/raw/stock_data/NVDA/
-data/raw/macro_stock_data/SPY/
-data/raw/macro_stock_data/SOXX/
-data/raw/macro_stock_data/IEF/
-data/raw/trends/
+lookback=90, lstm_units=96, dense_units=64, lr=0.0003,
+batch=64, dropout=0.10, recurrent_dropout=0.20, auto_threshold=True
 ```
 
-Expected cleaned model dataset:
+Run it on the current clean dataset with:
+
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 GPU=0 \
+  bash scripts/run_stock_full_pipeline.sh legacy_05506
+```
+
+This reruns the old parameter setting. It does not hard-code the old metric, so small differences are expected.
+
+## 5. Raw-data acquisition details
+
+The `data` phase performs raw checks/fetching automatically. It uses:
+
+- StockData.org EOD data for the target ticker and SPY/SOXX/IEF;
+- StockData.org symbol-filtered news headlines;
+- PyTrends Google Trends collection using the configured `KEYWORD`.
+
+Default news limit:
+
+```bash
+NEWS_LIMIT_PER_DAY=25
+```
+
+If local raw/processed files already exist, the pipeline reuses them. Set `FORCE=1` to rebuild/refetch.
+
+## 6. Classical baselines only
+
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh baselines
+```
+
+Direct command equivalent:
+
+```bash
+python -m thesis.eval.run_baseline_models_linear_svm \
+  --dataset data/model_feed/nvda_model_dataset_clean.csv \
+  --run-ablations \
+  --outdir artifacts/reports/nvda_baseline_models_linear_svm_ablations
+```
+
+## 7. Combined model comparison only
+
+```bash
+SYMBOL=NVDA KEYWORD="NVIDIA stock" bash scripts/run_stock_full_pipeline.sh model_comparison
+```
+
+Direct command equivalent:
+
+```bash
+python -m thesis.eval.make_model_comparison_table \
+  --baseline-metrics artifacts/reports/nvda_baseline_models_linear_svm_ablations/tables/baseline_model_metrics.csv \
+  --lstm-summary artifacts/models/nvda_walk_forward_random_search_bestparams/thesis_report_gross/report_summary.json \
+  --outdir artifacts/reports/nvda_model_comparison
+```
+
+## 8. Main outputs
+
+For NVDA, the main generated files/folders are:
 
 ```text
-data/model_feed/model_dataset_clean.csv
+data/model_feed/nvda_model_dataset.csv
+data/model_feed/nvda_model_dataset_clean.csv
+data/model_feed/nvda_model_dataset_audit.xlsx
+artifacts/models/nvda_random_search_reduced_features/
+artifacts/models/nvda_walk_forward_random_search_bestparams/
+artifacts/models/nvda_walk_forward_random_search_bestparams/thesis_report_gross/
+artifacts/reports/nvda_baseline_models_linear_svm_ablations/
+artifacts/reports/nvda_model_comparison/
+artifacts/reports/nvda_full_pipeline_summary.csv
 ```
 
-The dataset is intentionally ignored by Git by default. See `docs/DATA.md` for guidance on whether to publish it.
+## 9. Lightweight checks
 
-## 4. Preprocessing pipeline
-
-Show available preprocessing commands:
-
-```cmd
-thesis-preprocess --help
-```
-
-Full preprocessing run, assuming raw files are in the default locations:
-
-```cmd
-thesis-preprocess all
-```
-
-Individual stages:
-
-```cmd
-thesis-preprocess news-combine
-thesis-preprocess news-clean
-thesis-preprocess news-sentiment
-thesis-preprocess stock-clean-all
-thesis-preprocess trends-reconstruct
-thesis-preprocess trends-clean
-thesis-preprocess build-model
-thesis-preprocess write-clean
-thesis-preprocess validate --input data\model_feed\model_dataset_clean.csv
-thesis-preprocess audit --input data\model_feed\model_dataset_clean.csv --output data\model_feed\model_dataset_audit.xlsx
-```
-
-## 5. Dataset diagnostics and thesis figures
-
-```cmd
-python -m thesis.eval.make_scientific_outputs
-```
-
-## 6. Classical baselines with linear SVM
-
-```cmd
-python -m thesis.eval.run_baseline_models_linear_svm ^
-  --run-ablations ^
-  --outdir artifacts\reports\baseline_models_linear_svm_ablations
-```
-
-## 7. LSTM hyperparameter tuning
-
-```cmd
-thesis-tune-lstm --trials 50 --auto_threshold
-```
-
-## 8. Final LSTM walk-forward reproduction
-
-```cmd
-thesis-walkforward-lstm ^
-  --data data\model_feed\model_dataset_clean.csv ^
-  --outdir artifacts\models\walk_forward_direction_bestparams_reproduction ^
-  --lookback 90 ^
-  --initial_train 700 ^
-  --val_size 126 ^
-  --test_horizon 63 ^
-  --step 63 ^
-  --epochs 30 ^
-  --batch 64 ^
-  --lr 0.0003 ^
-  --lstm_units 96 ^
-  --dense_units 64 ^
-  --dropout 0.10 ^
-  --recurrent_dropout 0.20 ^
-  --auto_threshold
-```
-
-## 9. LSTM statistical report
-
-```cmd
-python src\thesis\eval\thesis_walkforward_report.py ^
-  --oos artifacts\models\walk_forward_direction_bestparams_reproduction\walk_forward_oos_predictions.csv ^
-  --summary artifacts\models\walk_forward_direction_bestparams_reproduction\walk_forward_summary.json ^
-  --outdir artifacts\reports\lstm_walkforward_bestparams_reproduction ^
-  --cost_bps 5
-```
-
-## 10. Combined LSTM + baseline comparison table
-
-```cmd
-thesis-model-comparison ^
-  --baseline-metrics artifacts\reports\baseline_models_linear_svm_ablations\tables\baseline_model_metrics.csv ^
-  --lstm-auc 0.550643920654932 ^
-  --lstm-accuracy 0.5178571428571429 ^
-  --lstm-sharpe 0.9957887190041333 ^
-  --lstm-trade-rate 0.5396825396825397 ^
-  --outdir artifacts\reports\model_comparison
-```
-
-## 11. Recommended reproduction sequences
-
-From cleaned dataset:
-
-```cmd
-python -m thesis.eval.make_scientific_outputs
-python -m thesis.eval.run_baseline_models_linear_svm --run-ablations --outdir artifacts\reports\baseline_models_linear_svm_ablations
-thesis-model-comparison --baseline-metrics artifacts\reports\baseline_models_linear_svm_ablations\tables\baseline_model_metrics.csv --lstm-auc 0.550643920654932 --lstm-accuracy 0.5178571428571429 --lstm-sharpe 0.9957887190041333 --lstm-trade-rate 0.5396825396825397 --outdir artifacts\reports\model_comparison
-```
-
-From raw data:
-
-```cmd
-thesis-fetch-stockdata market --mode eod --symbol NVDA --start 2019-03-01 --end 2026-03-01 --csv
-thesis-fetch-stockdata market --mode eod --symbol SPY --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SPY
-thesis-fetch-stockdata market --mode eod --symbol SOXX --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\SOXX
-thesis-fetch-stockdata market --mode eod --symbol IEF --start 2019-03-01 --end 2026-03-01 --csv --outdir data\raw\macro_stock_data\IEF
-thesis-fetch-stockdata news --symbols NVDA --start 2019-03-01 --end 2026-03-01 --chunk-days 30 --csv
-thesis-preprocess all
-python -m thesis.eval.make_scientific_outputs
-python -m thesis.eval.run_baseline_models_linear_svm --run-ablations --outdir artifacts\reports\baseline_models_linear_svm_ablations
-thesis-model-comparison --baseline-metrics artifacts\reports\baseline_models_linear_svm_ablations\tables\baseline_model_metrics.csv --lstm-auc 0.550643920654932 --lstm-accuracy 0.5178571428571429 --lstm-sharpe 0.9957887190041333 --lstm-trade-rate 0.5396825396825397 --outdir artifacts\reports\model_comparison
+```bash
+pytest tests/test_imports.py
+ROOT=$PWD PYTHON=python bash scripts/run_stock_full_pipeline.sh env
+python src/thesis/pipelines/run_stock_pipeline.py --help
+python src/thesis/pipelines/run_stock_pipeline_auto_window.py --help
 ```
