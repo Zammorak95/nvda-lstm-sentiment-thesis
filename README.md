@@ -143,12 +143,13 @@ Set the StockData.org token locally as `STOCKDATA_API_TOKEN` or `STOCKDATA_API_K
 ├── data/                         # Local raw/intermediate/processed/model-feed data; not meant for normal commits
 ├── docs/                         # Thesis workflow notes and command references
 ├── scripts/
-│   ├── run_stock_full_pipeline.sh # Generic end-to-end stock pipeline
-│   └── run_nvda_full_pipeline.sh  # NVDA convenience wrapper
+│   └── run_stock_full_pipeline.sh # Active generic end-to-end stock pipeline
 ├── src/thesis/
 │   ├── pipelines/                # Generic stock data pipeline wrappers
 │   ├── eval/                     # Reports, tables, figures and statistical evaluation
 │   └── model_training/           # Random search and walk-forward LSTM scripts
+├── artifacts/
+│   └── legacy/                   # Archived helpers replaced by the generic pipeline
 ├── requirements-reproducibility.txt
 ├── .env.example
 ├── Makefile
