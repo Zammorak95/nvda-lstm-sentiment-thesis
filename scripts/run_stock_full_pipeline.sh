@@ -4,21 +4,15 @@ set -euo pipefail
 # Generic end-to-end thesis pipeline for one stock ticker.
 #
 # Main research route:
-#   raw data checks/fetch -> processing/audit -> reduced dataset -> random search
-#   -> walk-forward with best hyperparameters -> gross thesis reports -> summary.
+#   data -> reduced -> random_search -> walk_bestparams -> report_bestparams
+#   -> baselines -> model_comparison -> summary
 #
-# The script is API-conscious:
-#   - if raw stock/news/trends data are already present, it reuses them;
-#   - if processed files already exist, it skips API collection unless FORCE=1;
-#   - StockData news availability is scanned only when no usable news/raw/sentiment
-#     date can be inferred locally and NEWS_START=auto.
-#
-# Example runs:
-#   SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 TRIALS=50 GPU=0 bash scripts/run_stock_full_pipeline.sh all
-#   SYMBOL=AMD  KEYWORD="AMD stock"    END=2026-02-26 TRIALS=50 GPU=0 bash scripts/run_stock_full_pipeline.sh all
-#   SYMBOL=NVDA KEYWORD="NVIDIA stock" TRIALS=10 GPU=0 bash scripts/run_stock_full_pipeline.sh model_main
+# Optional historical NVDA check:
+#   legacy_05506 runs the old fixed best-parameter specification that produced
+#   approximately OOS AUC 0.5506 on the historical NVDA thesis dataset.
 
-ROOT="${ROOT:-/home/zammorak/thesis}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 PYTHON="${PYTHON:-$ROOT/.venv/bin/python}"
 if [[ ! -x "$PYTHON" ]]; then
   PYTHON="python3"
@@ -31,7 +25,7 @@ KEYWORD="${KEYWORD:-${SYMBOL_UPPER} stock}"
 SCAN_START="${SCAN_START:-2018-01-01}"
 END="${END:-$(date -d yesterday +%F)}"
 NEWS_START="${NEWS_START:-auto}"
-NEWS_LIMIT_PER_DAY="${NEWS_LIMIT_PER_DAY:-10}"
+NEWS_LIMIT_PER_DAY="${NEWS_LIMIT_PER_DAY:-25}"
 MARKET_BUFFER_DAYS="${MARKET_BUFFER_DAYS:-45}"
 FORCE="${FORCE:-0}"
 GPU="${GPU:-0}"
@@ -41,20 +35,21 @@ WALK_EPOCHS="${WALK_EPOCHS:-30}"
 
 TARGET_RAW_DIR="$ROOT/data/raw/stock_data/$SYMBOL_UPPER"
 NEWS_RAW_DIR="$ROOT/data/raw/news_headlines_$SYMBOL_LOWER"
-TRENDS_RAW_DIR="$ROOT/data/raw/trends_${SYMBOL_LOWER}_pytrends"
-
-TARGET_PROCESSED="$ROOT/data/processed/${SYMBOL_UPPER}_eod_processed.csv"
 TRENDS_INTERIM="$ROOT/data/interim/${SYMBOL_LOWER}_trends_daily_consistent.csv"
 TRENDS_PROCESSED="$ROOT/data/processed/${SYMBOL_LOWER}_trends_processed.csv"
 NEWS_SENTIMENT="$ROOT/data/processed/${SYMBOL_LOWER}_news_daily_sentiment.csv"
+TARGET_PROCESSED="$ROOT/data/processed/${SYMBOL_UPPER}_eod_processed.csv"
 DATASET="$ROOT/data/model_feed/${SYMBOL_LOWER}_model_dataset.csv"
 REDUCED_DATASET="$ROOT/data/model_feed/${SYMBOL_LOWER}_model_dataset_clean.csv"
 AUDIT="$ROOT/data/model_feed/${SYMBOL_LOWER}_model_dataset_audit.xlsx"
 
 RANDOM_OUT="$ROOT/artifacts/models/${SYMBOL_LOWER}_random_search_reduced_features"
 BEST_OUT="$ROOT/artifacts/models/${SYMBOL_LOWER}_walk_forward_random_search_bestparams"
+LEGACY_OUT="$ROOT/artifacts/models/${SYMBOL_LOWER}_walk_forward_legacy_05506_params"
 FIXED_REDUCED_OUT="$ROOT/artifacts/models/${SYMBOL_LOWER}_walk_forward_reduced_fixedparams"
 FIXED_FULL_OUT="$ROOT/artifacts/models/${SYMBOL_LOWER}_walk_forward_full_fixedparams"
+BASELINE_OUT="$ROOT/artifacts/reports/${SYMBOL_LOWER}_baseline_models_linear_svm_ablations"
+MODEL_COMPARISON_OUT="$ROOT/artifacts/reports/${SYMBOL_LOWER}_model_comparison"
 SUMMARY_OUT="$ROOT/artifacts/reports/${SYMBOL_LOWER}_full_pipeline_summary.csv"
 
 AUTO_PIPELINE="$ROOT/src/thesis/pipelines/run_stock_pipeline_auto_window.py"
@@ -140,11 +135,6 @@ if scan.exists():
             hits = day[day['found_num'] > 0]
             if len(hits):
                 candidates.append(pd.to_datetime(hits['range_start'], errors='coerce').min())
-        elif 'date' in df.columns and 'found' in df.columns:
-            df['found_num'] = pd.to_numeric(df['found'], errors='coerce').fillna(0)
-            hits = df[df['found_num'] > 0]
-            if len(hits):
-                candidates.append(pd.to_datetime(hits['date'], errors='coerce').min())
     except Exception:
         pass
 
@@ -222,7 +212,6 @@ ensure_stock_processed() {
   local symbol="$1"
   local raw_dir="$2"
   local processed="$3"
-  local macro_flag="$4"
 
   if [[ "$FORCE" != "1" && -f "$processed" ]]; then
     echo "[SKIP] Processed EOD exists for $symbol: $processed"
@@ -259,10 +248,10 @@ phase_data() {
   phase_env
   resolve_window
 
-  ensure_stock_processed "$SYMBOL_UPPER" "$TARGET_RAW_DIR" "$TARGET_PROCESSED" "target"
-  ensure_stock_processed "SPY"  "$ROOT/data/raw/macro_stock_data/SPY"  "$ROOT/data/processed/SPY_eod_processed.csv"  "macro"
-  ensure_stock_processed "SOXX" "$ROOT/data/raw/macro_stock_data/SOXX" "$ROOT/data/processed/SOXX_eod_processed.csv" "macro"
-  ensure_stock_processed "IEF"  "$ROOT/data/raw/macro_stock_data/IEF"  "$ROOT/data/processed/IEF_eod_processed.csv"  "macro"
+  ensure_stock_processed "$SYMBOL_UPPER" "$TARGET_RAW_DIR" "$TARGET_PROCESSED"
+  ensure_stock_processed "SPY"  "$ROOT/data/raw/macro_stock_data/SPY"  "$ROOT/data/processed/SPY_eod_processed.csv"
+  ensure_stock_processed "SOXX" "$ROOT/data/raw/macro_stock_data/SOXX" "$ROOT/data/processed/SOXX_eod_processed.csv"
+  ensure_stock_processed "IEF"  "$ROOT/data/raw/macro_stock_data/IEF"  "$ROOT/data/processed/IEF_eod_processed.csv"
 
   if [[ "$FORCE" != "1" && -f "$TRENDS_PROCESSED" ]]; then
     echo "[SKIP] Processed Trends exists: $TRENDS_PROCESSED"
@@ -325,21 +314,24 @@ import pandas as pd
 input_path = Path('$DATASET')
 output_path = Path('$REDUCED_DATASET')
 cols = [
-    'date', 'log_return', 'overnight_return', 'momentum_5d', 'momentum_20d',
-    'volatility_20d', 'volume_change', 'volume_20d_avg', 'avg_sentiment',
-    'spy_return', 'soxx_return', 'ief_return', 'trends_zscore_30d',
-    'trends_momentum_7d', 'target_direction', 'target_next_return'
+    'date',
+    'log_return', 'overnight_return', 'momentum_5d', 'momentum_20d',
+    'volatility_20d', 'volume_change', 'volume_20d_avg',
+    'avg_sentiment', 'sentiment_std', 'news_count',
+    'spy_return', 'soxx_return', 'ief_return',
+    'trends_zscore_30d', 'trends_momentum_7d', 'trends_spike',
+    'target_direction', 'target_next_return',
 ]
 df = pd.read_csv(input_path)
 missing = [c for c in cols if c not in df.columns]
 if missing:
-    raise ValueError(f'Missing reduced feature columns: {missing}')
+    raise ValueError(f'Missing thesis feature columns: {missing}')
 out = df[cols].replace([float('inf'), float('-inf')], pd.NA).dropna().reset_index(drop=True)
 output_path.parent.mkdir(parents=True, exist_ok=True)
 out.to_csv(output_path, index=False)
 print('Saved:', output_path)
 print('Rows:', len(out))
-print('Columns:', len(out.columns))
+print('Feature columns:', len([c for c in out.columns if c not in {'date', 'target_direction', 'target_next_return'}]))
 print('Range:', out['date'].min(), '->', out['date'].max())
 print('Target balance:')
 print(out['target_direction'].value_counts(normalize=True).round(4).sort_index())
@@ -403,6 +395,33 @@ phase_report_bestparams() {
     --outdir "$BEST_OUT/thesis_report_gross"
 }
 
+phase_walk_legacy_05506() {
+  require_file "$REDUCED_DATASET"
+  echo "[LEGACY] Running the historical NVDA best-parameter specification."
+  echo "[LEGACY] Expected historical NVDA OOS AUC was approximately 0.5506, but retraining is stochastic."
+  run "$PYTHON" -u "$WALK_SCRIPT" \
+    --data "$REDUCED_DATASET" \
+    --outdir "$LEGACY_OUT" \
+    --lookback 90 \
+    --initial_train 700 \
+    --val_size 126 \
+    --test_horizon 63 \
+    --step 63 \
+    --epochs "$WALK_EPOCHS" \
+    --batch 64 \
+    --lr 0.0003 \
+    --lstm_units 96 \
+    --dense_units 64 \
+    --dropout 0.10 \
+    --recurrent_dropout 0.20 \
+    --auto_threshold \
+    --gpu "$GPU"
+  run "$PYTHON" -u "$REPORT_SCRIPT" \
+    --oos "$LEGACY_OUT/walk_forward_oos_predictions.csv" \
+    --summary "$LEGACY_OUT/walk_forward_summary.json" \
+    --outdir "$LEGACY_OUT/thesis_report_gross"
+}
+
 phase_walk_reduced_fixed() {
   require_file "$REDUCED_DATASET"
   run "$PYTHON" -u "$WALK_SCRIPT" \
@@ -460,6 +479,28 @@ phase_report_fixed() {
   fi
 }
 
+phase_baselines() {
+  require_file "$REDUCED_DATASET"
+  run "$PYTHON" -m thesis.eval.run_baseline_models_linear_svm \
+    --dataset "$REDUCED_DATASET" \
+    --run-ablations \
+    --outdir "$BASELINE_OUT"
+}
+
+phase_model_comparison() {
+  require_file "$BASELINE_OUT/tables/baseline_model_metrics.csv"
+  local lstm_summary="$BEST_OUT/thesis_report_gross/report_summary.json"
+  if [[ ! -f "$lstm_summary" ]]; then
+    lstm_summary="$BEST_OUT/walk_forward_summary.json"
+  fi
+  require_file "$lstm_summary"
+  run "$PYTHON" -m thesis.eval.make_model_comparison_table \
+    --baseline-metrics "$BASELINE_OUT/tables/baseline_model_metrics.csv" \
+    --feature-set all_features \
+    --lstm-summary "$lstm_summary" \
+    --outdir "$MODEL_COMPARISON_OUT"
+}
+
 phase_summary() {
   run "$PYTHON" - <<PY
 import json
@@ -470,6 +511,8 @@ items = {
     '${SYMBOL_LOWER}_random_search_meta': Path('$RANDOM_OUT') / 'best/meta.json',
     '${SYMBOL_LOWER}_walk_forward_bestparams': Path('$BEST_OUT') / 'walk_forward_summary.json',
     '${SYMBOL_LOWER}_walk_forward_bestparams_report': Path('$BEST_OUT') / 'thesis_report_gross/report_summary.json',
+    '${SYMBOL_LOWER}_legacy_05506_params': Path('$LEGACY_OUT') / 'walk_forward_summary.json',
+    '${SYMBOL_LOWER}_legacy_05506_report': Path('$LEGACY_OUT') / 'thesis_report_gross/report_summary.json',
     '${SYMBOL_LOWER}_fixed_reduced': Path('$FIXED_REDUCED_OUT') / 'walk_forward_summary.json',
     '${SYMBOL_LOWER}_fixed_full': Path('$FIXED_FULL_OUT') / 'walk_forward_summary.json',
 }
@@ -519,6 +562,8 @@ out_path.parent.mkdir(parents=True, exist_ok=True)
 out.to_csv(out_path, index=False)
 print(out.to_string(index=False))
 print('\nSaved:', out_path)
+print('Baseline metrics:', Path('$BASELINE_OUT') / 'tables/baseline_model_metrics.csv')
+print('Model comparison:', Path('$MODEL_COMPARISON_OUT') / 'model_comparison_table.csv')
 PY
 }
 
@@ -532,33 +577,37 @@ Configure with environment variables:
   SCAN_START=2018-01-01
   END=2026-03-01
   NEWS_START=auto or explicit YYYY-MM-DD
+  NEWS_LIMIT_PER_DAY=25
   TRIALS=50
   GPU=0
 
 Main phases:
   env                 Check configuration and required scripts
   data                Raw checks/fetch -> process -> model dataset -> validate/audit
-  reduced             Build reduced feature dataset
+  reduced             Build thesis 16-feature clean dataset
   random_search       Hyperparameter search on reduced dataset
   walk_bestparams     Walk-forward using best random-search hyperparameters
   report_bestparams   Gross thesis report, tables and figures for bestparams run
+  baselines           Majority/logistic/linear SVM/RF + feature ablations
+  model_comparison    Combined LSTM + baseline table/figures
   summary             One CSV with key metrics
 
 Optional comparison phases:
+  legacy_05506        Old fixed NVDA bestparams route: lookback=90, LSTM=96, lr=0.0003
   walk_reduced_fixed  Fixed-parameter reduced walk-forward
   walk_full_fixed     Fixed-parameter full-feature walk-forward
   report_fixed        Gross reports for fixed comparison runs if present
 
 Bundles:
-  all                 data -> reduced -> random_search -> walk_bestparams -> report_bestparams -> fixed comparisons -> summary
-  main                data -> reduced -> random_search -> walk_bestparams -> report_bestparams -> summary
-  model_main          random_search -> walk_bestparams -> report_bestparams -> summary
+  all                 data -> reduced -> random_search -> walk_bestparams -> report_bestparams -> baselines -> model_comparison -> fixed comparisons -> summary
+  main                data -> reduced -> random_search -> walk_bestparams -> report_bestparams -> baselines -> model_comparison -> summary
+  model_main          random_search -> walk_bestparams -> report_bestparams -> baselines -> model_comparison -> summary
   fixed_compare       walk_reduced_fixed -> walk_full_fixed -> report_fixed -> summary
 
 Examples:
   SYMBOL=NVDA KEYWORD="NVIDIA stock" END=2026-03-01 TRIALS=50 GPU=0 bash scripts/run_stock_full_pipeline.sh all
   SYMBOL=AMD  KEYWORD="AMD stock"    END=2026-02-26 TRIALS=50 GPU=0 bash scripts/run_stock_full_pipeline.sh all
-  SYMBOL=NVDA KEYWORD="NVIDIA stock" TRIALS=10 GPU=0 bash scripts/run_stock_full_pipeline.sh model_main
+  SYMBOL=NVDA KEYWORD="NVIDIA stock" GPU=0 bash scripts/run_stock_full_pipeline.sh legacy_05506
 EOF
 }
 
@@ -569,7 +618,10 @@ case "$phase" in
   random_search) phase_random_search ;;
   walk_bestparams) phase_walk_bestparams ;;
   report_bestparams) phase_report_bestparams ;;
+  baselines) phase_baselines ;;
+  model_comparison) phase_model_comparison ;;
   summary) phase_summary ;;
+  legacy_05506) phase_walk_legacy_05506 ;;
   walk_reduced_fixed) phase_walk_reduced_fixed ;;
   walk_full_fixed) phase_walk_full_fixed ;;
   report_fixed) phase_report_fixed ;;
@@ -579,6 +631,8 @@ case "$phase" in
     phase_random_search
     phase_walk_bestparams
     phase_report_bestparams
+    phase_baselines
+    phase_model_comparison
     phase_walk_reduced_fixed
     phase_walk_full_fixed
     phase_report_fixed
@@ -590,12 +644,16 @@ case "$phase" in
     phase_random_search
     phase_walk_bestparams
     phase_report_bestparams
+    phase_baselines
+    phase_model_comparison
     phase_summary
     ;;
   model_main)
     phase_random_search
     phase_walk_bestparams
     phase_report_bestparams
+    phase_baselines
+    phase_model_comparison
     phase_summary
     ;;
   fixed_compare)
