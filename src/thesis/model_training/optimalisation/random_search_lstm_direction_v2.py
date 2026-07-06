@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-<<<<<<< HEAD
 """Random search hyperparameter optimization for a ROCm-safe LSTM direction classifier.
 
 What it does
@@ -16,33 +15,6 @@ The search space intentionally includes 96 LSTM units because the historical NVD
 thesis run that produced an OOS AUC of approximately 0.5506 used 96 units. This
 keeps the generic pipeline capable of rediscovering or approximating that earlier
 specification when the same dataset and environment are used.
-=======
-"""
-Random search hyperparameter optimization for ROCm-safe LSTM direction classifier.
-
-What it does
-- Loads your (clean) model dataset (default: model_dataset_clean.csv)
-- Uses chronological split: train | val | test (time-series safe)
-- Scales using TRAIN ONLY (prevents leakage)
-- Randomly samples hyperparameters from a *narrowed* search space (based on your best trials)
-- Trains with EarlyStopping on val_auc
-- Evaluates each trial on validation AUC + accuracy (using an auto threshold if enabled)
-- Logs every trial to CSV (incremental write)
-- Saves the best model/scaler/meta to outdir/best/
-- At the end, evaluates the best model on the TEST set and appends results to best/meta.json
-
-GPU
-- Use HIP_VISIBLE_DEVICES to select your AMD GPU (e.g. HIP_VISIBLE_DEVICES=0 ...)
-- Or pass --gpu 0 which sets HIP_VISIBLE_DEVICES internally.
-
-ROCm / MIOpen
-- Forces the non-fused LSTM path to avoid: "ROCm MIOpen only supports packed input output."
-  by using implementation=1 and recurrent_dropout>0.
-
-Example
-  source /home/zammorak/thesis/.venv/bin/activate
-  HIP_VISIBLE_DEVICES=0 python random_search_lstm_direction_v2.py --trials 50 --auto_threshold
->>>>>>> origin/main
 """
 
 import os
@@ -72,15 +44,9 @@ def make_sequences(X: np.ndarray, y: np.ndarray, lookback: int) -> Tuple[np.ndar
     """Create lookback sequences ending at each time t with label y[t]."""
     Xs, ys = [], []
     for i in range(lookback, len(X)):
-<<<<<<< HEAD
         Xs.append(X[i - lookback : i])
         ys.append(int(y[i]))
     return np.asarray(Xs, dtype=np.float32), np.asarray(ys, dtype=np.int32)
-=======
-        Xs.append(X[i - lookback:i])
-        ys.append(y[i])
-    return np.asarray(Xs), np.asarray(ys)
->>>>>>> origin/main
 
 
 def build_model(
@@ -385,15 +351,10 @@ def main() -> None:
         print("No valid trials produced a best model.")
         return
 
-<<<<<<< HEAD
     lb = int(best_payload["params"]["lookback"])
     X_seq, y_seq = make_sequences(X_scaled_full, y_all, lb)
     X_test = X_seq[test_start - lb :]
     y_test = y_seq[test_start - lb :]
-=======
-    best_params = best_payload["params"]
-    lb = int(best_params["lookback"])
->>>>>>> origin/main
 
     X_seq, y_seq = make_sequences(X_scaled_full, y_all, lb)
     seq_test_start = test_start - lb

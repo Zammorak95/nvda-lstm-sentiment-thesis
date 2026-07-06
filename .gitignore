@@ -1,11 +1,13 @@
 # environments / secrets
 .venv/
+**/.venv/
 venv/
 .env
 *.env
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.pytest_cache/
 
 # data - do not upload raw/proprietary data
 data/raw/
@@ -14,9 +16,10 @@ data/processed/
 data/model_feed/*.csv
 data/model_feed/*.xlsx
 artifacts/data/
+*.part
 *.parquet
 
-# trained models / large artifacts
+# trained models / large binary artifacts
 /models/
 mlruns/
 *.keras
@@ -36,48 +39,16 @@ artifacts/legacy/**
 !artifacts/legacy/README.md
 !artifacts/legacy/legacy_moves.csv
 
-# local/debug files
+# local/editor/debug files
+.vscode/
 misc/Error.txt
 .DS_Store
 Thumbs.db
 src/*.egg-info/
 
-<<<<<<< HEAD
-# Local Python environments
-.venv/
-**/.venv/
-
-# Raw/intermediate/local data
-data/raw/
-data/interim/
-data/processed/
-artifacts/data/
-*.part
-
-# Old local dumps / copied environments
-artifacts/sort/
-artifacts/models/OLD/
-
-# Local caches
-__pycache__/
-.pytest_cache/
-.ipynb_checkpoints/
-=======
-# Local/editor files
-.vscode/
-
-# Local thesis working artifacts
-Prompt_explain.txt
-artifacts/
-final_results/
-misc/
-notebooks/
-*.save
-
-# Local result collection scripts/reports
+# local result collection scripts/reports
 collect_all_results.py
 collect_thesis_results.py
 generate_results_summary.py
 thesis_results_report.txt
 thesis_results_table.csv
->>>>>>> origin/main
