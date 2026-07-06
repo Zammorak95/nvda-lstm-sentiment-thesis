@@ -1,11 +1,13 @@
 # environments / secrets
 .venv/
+**/.venv/
 venv/
 .env
 *.env
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.pytest_cache/
 
 # data - do not upload raw/proprietary data
 data/raw/
@@ -14,10 +16,11 @@ data/processed/
 data/model_feed/*.csv
 data/model_feed/*.xlsx
 artifacts/data/
+*.part
 *.parquet
 
-# trained models / large artifacts
-models/
+# trained models / large binary artifacts
+/models/
 mlruns/
 *.keras
 *.h5
@@ -26,24 +29,24 @@ mlruns/
 *.joblib
 *.npy
 
-# local/debug files
+# old local dumps / accidental copied environments
+artifacts/sort/
+artifacts/models/OLD/
+
+# keep only the legacy index files in Git; keep bulky legacy outputs local
+artifacts/legacy/**
+!artifacts/legacy/
+!artifacts/legacy/README.md
+!artifacts/legacy/legacy_moves.csv
+
+# local/editor/debug files
+.vscode/
 misc/Error.txt
 .DS_Store
 Thumbs.db
 src/*.egg-info/
 
-# Local/editor files
-.vscode/
-
-# Local thesis working artifacts
-Prompt_explain.txt
-artifacts/
-final_results/
-misc/
-notebooks/
-*.save
-
-# Local result collection scripts/reports
+# local result collection scripts/reports
 collect_all_results.py
 collect_thesis_results.py
 generate_results_summary.py

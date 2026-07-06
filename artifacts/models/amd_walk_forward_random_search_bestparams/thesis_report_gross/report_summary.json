@@ -1,0 +1,43 @@
+{
+  "classification": {
+    "oos_auc": 0.4760446237362419,
+    "oos_acc": 0.49029982363315694,
+    "trade_rate": 0.6455026455026455,
+    "brier": 0.2565006451199441
+  },
+  "cost_bps": 0.0,
+  "statsmodels_available": true,
+  "trading": {
+    "annualized_sharpe": 0.6180542870138431,
+    "max_drawdown": -0.5723690722362202,
+    "mean_daily_return": 0.0010929892404424478,
+    "std_daily_return": 0.02807304578229059,
+    "ttest": {
+      "t_mean": 0.0010929892404424478,
+      "t_stat": 0.9262635376129644,
+      "t_p_approx": 0.35430903999671415,
+      "n": 567
+    },
+    "hac_test": {
+      "hac_available": true,
+      "hac_mean": 0.001092989240442448,
+      "hac_se": 0.0011522203229946122,
+      "hac_t": 0.9485939612675612,
+      "hac_p": 0.34282716348901465,
+      "hac_lags": 5
+    },
+    "bootstrap_sharpe": {
+      "sharpe_boot_mean": 0.6133209416309857,
+      "sharpe_ci_2p5": -0.6743197114006162,
+      "sharpe_ci_50": 0.6227246451165729,
+      "sharpe_ci_97p5": 1.8721036621774214
+    },
+    "permutation_test": {
+      "perm_obs_mean": 0.0010929892404424478,
+      "perm_pvalue_one_sided": 0.39580209895052476
+    },
+    "num_days": 567,
+    "num_trades": 366
+  },
+  "summary_json_used": "/home/zammorak/thesis/artifacts/models/amd_walk_forward_random_search_bestparams/walk_forward_summary.json"
+}

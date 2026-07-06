@@ -1,0 +1,5 @@
+feature_set,feature_count,status,auc,accuracy,sharpe,trade_rate,max_drawdown,mean_daily_return,num_trades,report
+market_only,10,ok,0.5310180875952806,0.4567901234567901,-0.5050053842694306,0.3262786596119929,-0.5274474519371419,-0.0006733702577156356,185,/home/zammorak/thesis/artifacts/models/nvda_lstm_feature_ablation/market_only/thesis_report_gross/report_summary.json
+market_sentiment,13,ok,0.5488792734773968,0.4991181657848324,0.6898527357718567,0.4144620811287478,-0.3605044515527319,0.0008587030987501809,235,/home/zammorak/thesis/artifacts/models/nvda_lstm_feature_ablation/market_sentiment/thesis_report_gross/report_summary.json
+market_attention,13,ok,0.5027043344821513,0.4973544973544973,1.6126057437249237,0.43033509700176364,-0.21965123526931962,0.001694422106523022,244,/home/zammorak/thesis/artifacts/models/nvda_lstm_feature_ablation/market_attention/thesis_report_gross/report_summary.json
+full_model,16,ok,0.5447158562048753,0.49029982363315694,1.717799915918411,0.36684303350970016,-0.17137186434225582,0.001759945696140291,208,/home/zammorak/thesis/artifacts/models/nvda_lstm_feature_ablation/full_model/thesis_report_gross/report_summary.json

@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""LSTM regression: predict next-day return (target_next_return) and optionally implied next-day close.
+
+GPU (ROCm):
+  - Set HIP_VISIBLE_DEVICES before importing tensorflow to select your dedicated AMD GPU.
+"""
+
+import os
+import json
+import argparse
+import numpy as np
+import pandas as pd
+
+def _set_gpu(gpu_index):
+    if gpu_index is not None:
+        os.environ["HIP_VISIBLE_DEVICES"] = str(gpu_index)
+
+import tensorflow as tf
+from tensorflow.keras import layers, models, callbacks
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+import joblib
+
+
+def make_sequences(X, y, lookback):
+    Xs, ys = [], []
+    for i in range(lookback, len(X)):
+        Xs.append(X[i - lookback:i])
+        ys.append(y[i])
+    return np.asarray(Xs), np.asarray(ys)
+
+
+def directional_accuracy(y_true, y_pred):
+    return float(np.mean((y_true > 0) == (y_pred > 0)))
+
+
+def build_model(lookback, n_features, lr, lstm_units, dropout):
+    model = models.Sequential([
+        layers.Input(shape=(lookback, n_features)),
+        layers.LSTM(lstm_units, return_sequences=False),
+        layers.Dropout(dropout),
+        layers.Dense(32, activation="relu"),
+        layers.Dense(1)
+    ])
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr), loss="mse")
+    return model
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data", required=True, help="Path to model_dataset.csv")
+    ap.add_argument("--outdir", required=True, help="Output directory for model + artifacts")
+    ap.add_argument("--lookback", type=int, default=30)
+    ap.add_argument("--val_size", type=int, default=126)
+    ap.add_argument("--test_size", type=int, default=252)
+    ap.add_argument("--epochs", type=int, default=50)
+    ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--lr", type=float, default=1e-3)
+    ap.add_argument("--lstm_units", type=int, default=64)
+    ap.add_argument("--dropout", type=float, default=0.2)
+    ap.add_argument("--gpu", default=None, help="AMD GPU index for HIP_VISIBLE_DEVICES (e.g., 0)")
+    ap.add_argument("--predict_close", action="store_true", help="Also output implied next close using current close * exp(pred)")
+    args = ap.parse_args()
+
+    _set_gpu(args.gpu)
+    os.makedirs(args.outdir, exist_ok=True)
+
+    df = pd.read_csv(args.data)
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.sort_values("date").reset_index(drop=True)
+
+    if "target_next_return" not in df.columns:
+        raise ValueError("target_next_return missing. Create it from log_return.shift(-1) before training.")
+    if args.predict_close and "close" not in df.columns:
+        raise ValueError("--predict_close requires 'close' column in dataset.")
+
+    drop_cols = {"date", "target_next_return", "target_direction"}
+    feature_cols = [c for c in df.columns if c not in drop_cols]
+    X_df = df[feature_cols].select_dtypes(include=[np.number]).copy()
+
+    y_all = df["target_next_return"].astype(float).to_numpy()
+    X_all = X_df.to_numpy()
+
+    n = len(df)
+    if args.test_size + args.val_size + args.lookback >= n:
+        raise ValueError("Not enough rows for chosen lookback/val/test sizes.")
+
+    test_start = n - args.test_size
+    val_start = test_start - args.val_size
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_all[:val_start])
+    X_val_scaled = scaler.transform(X_all[val_start:test_start])
+    X_test_scaled = scaler.transform(X_all[test_start:])
+    X_scaled = np.vstack([X_train_scaled, X_val_scaled, X_test_scaled])
+
+    X_seq, y_seq = make_sequences(X_scaled, y_all, args.lookback)
+    seq_val_start = val_start - args.lookback
+    seq_test_start = test_start - args.lookback
+
+    X_train, y_train = X_seq[:seq_val_start], y_seq[:seq_val_start]
+    X_val, y_val = X_seq[seq_val_start:seq_test_start], y_seq[seq_val_start:seq_test_start]
+    X_test, y_test = X_seq[seq_test_start:], y_seq[seq_test_start:]
+
+    print("TF GPUs:", tf.config.list_physical_devices("GPU"))
+
+    model = build_model(args.lookback, X_train.shape[-1], args.lr, args.lstm_units, args.dropout)
+    cb = [
+        callbacks.EarlyStopping(monitor="val_loss", patience=8, restore_best_weights=True),
+        callbacks.ReduceLROnPlateau(monitor="val_loss", patience=4, factor=0.5, min_lr=1e-5),
+    ]
+
+    model.fit(
+        X_train, y_train,
+        validation_data=(X_val, y_val),
+        epochs=args.epochs,
+        batch_size=args.batch,
+        callbacks=cb,
+        verbose=1
+    )
+
+    y_pred = model.predict(X_test).reshape(-1)
+    rmse = float(np.sqrt(mean_squared_error(y_test, y_pred)))
+    mae = float(mean_absolute_error(y_test, y_pred))
+    dir_acc = directional_accuracy(y_test, y_pred)
+
+    print("\nTest RMSE:", rmse)
+    print("Test MAE :", mae)
+    print("Directional accuracy (sign):", dir_acc)
+
+    model_path = os.path.join(args.outdir, "lstm_price_return_model.keras")
+    scaler_path = os.path.join(args.outdir, "lstm_price_return_scaler.joblib")
+    meta_path = os.path.join(args.outdir, "lstm_price_return_meta.json")
+    pred_path = os.path.join(args.outdir, "lstm_price_return_test_predictions.csv")
+
+    model.save(model_path)
+    joblib.dump(scaler, scaler_path)
+
+    test_dates = df["date"].iloc[test_start:].reset_index(drop=True)
+    if len(test_dates) != len(y_test):
+        test_dates = test_dates.iloc[-len(y_test):].reset_index(drop=True)
+
+    pred_df = pd.DataFrame({
+        "date": test_dates,
+        "y_true_target_next_return": y_test,
+        "y_pred_target_next_return": y_pred
+    })
+
+    if args.predict_close:
+        close_t = df["close"].iloc[test_start:].reset_index(drop=True)
+        if len(close_t) != len(y_pred):
+            close_t = close_t.iloc[-len(y_pred):].reset_index(drop=True)
+        pred_df["close_t"] = close_t
+        pred_df["implied_next_close_pred"] = close_t * np.exp(y_pred)
+
+    pred_df.to_csv(pred_path, index=False)
+
+    meta = {
+        "task": "price_return_regression",
+        "target": "target_next_return",
+        "lookback": args.lookback,
+        "val_size": args.val_size,
+        "test_size": args.test_size,
+        "feature_cols": X_df.columns.tolist(),
+        "metrics": {"rmse": rmse, "mae": mae, "directional_accuracy": dir_acc},
+        "hip_visible_devices": os.environ.get("HIP_VISIBLE_DEVICES", None),
+    }
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=2)
+
+    print("\nSaved:")
+    print("  model:", model_path)
+    print("  scaler:", scaler_path)
+    print("  meta :", meta_path)
+    print("  preds:", pred_path)
+
+
+if __name__ == "__main__":
+    main()

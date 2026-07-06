@@ -1,0 +1,43 @@
+{
+  "classification": {
+    "oos_auc": 0.5488792734773968,
+    "oos_acc": 0.4991181657848324,
+    "trade_rate": 0.4144620811287478,
+    "brier": 0.25852090955877727
+  },
+  "cost_bps": 0.0,
+  "statsmodels_available": true,
+  "trading": {
+    "annualized_sharpe": 0.6898527357718567,
+    "max_drawdown": -0.3605044515527319,
+    "mean_daily_return": 0.0008587030987501809,
+    "std_daily_return": 0.0197599986042662,
+    "ttest": {
+      "t_mean": 0.0008587030987501809,
+      "t_stat": 1.0338661973453953,
+      "t_p_approx": 0.3011987194619359,
+      "n": 567
+    },
+    "hac_test": {
+      "hac_available": true,
+      "hac_mean": 0.0008587030987501809,
+      "hac_se": 0.0007688617953706084,
+      "hac_t": 1.1168497432445152,
+      "hac_p": 0.2640585759510159,
+      "hac_lags": 5
+    },
+    "bootstrap_sharpe": {
+      "sharpe_boot_mean": 0.6982522757891084,
+      "sharpe_ci_2p5": -0.6156628096674293,
+      "sharpe_ci_50": 0.6982040351785335,
+      "sharpe_ci_97p5": 2.0115591461591102
+    },
+    "permutation_test": {
+      "perm_obs_mean": 0.0008587030987501809,
+      "perm_pvalue_one_sided": 0.6336831584207896
+    },
+    "num_days": 567,
+    "num_trades": 235
+  },
+  "summary_json_used": "/home/zammorak/thesis/artifacts/models/nvda_lstm_feature_ablation/market_sentiment/walk_forward_summary.json"
+}

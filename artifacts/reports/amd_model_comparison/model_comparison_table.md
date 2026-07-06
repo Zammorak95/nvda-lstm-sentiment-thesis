@@ -1,0 +1,7 @@
+| Model                     | Role                        |   OOS AUC |   OOS accuracy | Balanced accuracy   | Strategy Sharpe   |   Trade rate |   Max drawdown |
+|:--------------------------|:----------------------------|----------:|---------------:|:--------------------|:------------------|-------------:|---------------:|
+| Majority class            | Naïve benchmark             |    0.5    |         0.4868 | 0.5000              | —                 |       0      |         0      |
+| Logistic regression       | Linear benchmark            |    0.4796 |         0.5062 | 0.5068              | 1.2526            |       0.478  |        -0.4996 |
+| Linear SVM                | Classical ML benchmark      |    0.4834 |         0.5079 | 0.5087              | 1.2789            |       0.4727 |        -0.3558 |
+| Random Forest             | Non-linear robustness check |    0.4767 |         0.4797 | 0.4816              | 0.2398            |       0.4268 |        -0.525  |
+| LSTM (best specification) | Main model                  |    0.476  |         0.4903 | —                   | 0.6181            |       0.6455 |        -0.5724 |

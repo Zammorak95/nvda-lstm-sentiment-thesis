@@ -5,32 +5,38 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "thesis"
 version = "0.1.0"
-description = "A structured Python project for a Master's thesis on LSTM-based intraday stock forecasting"
+description = "A structured Python project for a Master's thesis on LSTM-based stock-direction forecasting"
 readme = "README.md"
 requires-python = ">=3.10"
-authors = [{ name = "Your Name" }]
+authors = [{ name = "Sherick Burggraaff" }]
 
-# Core runtime deps used by the preprocessing + baseline LSTM pipeline
+# Core runtime dependencies for data acquisition, preprocessing, evaluation, tables and figures.
 dependencies = [
   "pandas>=2.2",
-  "numpy>=1.26",               # pandas + sklearn compatibility
-  "scikit-learn>=1.4",         # StandardScaler, metrics
+  "numpy>=1.26",
+  "scikit-learn>=1.4",
   "pydantic>=2.7",
   "pydantic-settings>=2.3",
-  "python-dotenv>=1.0",        # for local .env during dev/notebooks
+  "python-dotenv>=1.0",
   "requests>=2.32",
   "typer>=0.12",
-  "rich>=13.7",                # nicer terminal output
-  "pyarrow>=14.0.0",           # Parquet support
-  "fastparquet>=2023.4.0",     # optional Parquet engine
+  "rich>=13.7",
+  "pyarrow>=14.0.0",
+  "fastparquet>=2023.4.0",
   "scipy>=1.11",
-  "matplotlib>=3.8",           # scientific figures and thesis-ready plots
-  "jinja2>=3.1",               # required by pandas to_latex/styler output
+  "matplotlib>=3.8",
+  "jinja2>=3.1",
+  "nltk>=3.8",
+  "xlsxwriter>=3.2",
+  "tabulate>=0.9",
+  "statsmodels>=0.14",
+  "pytrends>=4.9.2",
 ]
-# NOTE: PyTorch is intentionally NOT listed here to avoid accidentally installing the CPU wheel.
-# Install ROCm builds separately:
-#   pip uninstall -y torch torchvision torchaudio
-#   pip install --index-url https://download.pytorch.org/whl/rocm6.0 torch torchvision torchaudio
+# TensorFlow is intentionally not listed as a hard dependency because installation
+# differs by OS and hardware. Install it separately when reproducing the LSTM runs:
+#   python -m pip install tensorflow
+# For AMD ROCm/Linux setups, use the TensorFlow/ROCm installation recommended for
+# the local system instead of the generic CPU package.
 
 [project.optional-dependencies]
 dev = [
@@ -42,24 +48,20 @@ dev = [
   "types-requests",
   "mplfinance",
 ]
-# If you want an extra for notebooks/plots, uncomment:
-# nb = [
-#   "ipykernel",
-#   "matplotlib>=3.8",
-#   "jupyterlab",
-# ]
 
 [project.scripts]
 thesis = "thesis.cli:app"
+thesis-fetch-stockdata = "thesis.data_acquisition.stockdata_api:main"
+thesis-preprocess = "thesis.preprocessing.data_pipeline:main"
 thesis-scientific-outputs = "thesis.eval.make_scientific_outputs:main"
 thesis-baselines = "thesis.eval.run_baseline_models:main"
 thesis-baselines-linear-svm = "thesis.eval.run_baseline_models_linear_svm:main"
 thesis-model-comparison = "thesis.eval.make_model_comparison_table:main"
+thesis-tune-lstm = "thesis.model_training.optimalisation.tune_lstm_direction:main"
+thesis-walkforward-lstm = "thesis.model_training.optimalisation.evaluate_lstm_walk_forward:main"
 
 [project.urls]
-Homepage = "https://example.com"
-Repository = "https://example.com/repo"
-Issues = "https://example.com/issues"
+Repository = "https://github.com/Zammorak95/nvda-lstm-sentiment-thesis"
 
 [tool.setuptools.package-dir]
 "" = "src"
@@ -92,4 +94,4 @@ disallow_incomplete_defs = true
 check_untyped_defs = true
 no_implicit_optional = true
 mypy_path = "src"
-plugins = []  # add "pydantic.mypy" if you rely on pydantic v1-style plugin
+plugins = []

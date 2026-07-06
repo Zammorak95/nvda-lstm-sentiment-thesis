@@ -1,0 +1,2 @@
+trial,val_auc,val_acc,threshold,youden_j,best_epoch,best_val_auc_in_training,best_val_loss_in_training,seconds,lookback,lstm_units,dropout,recurrent_dropout,lr,batch,dense_units,val_cm_tn_fp_fn_tp
+1,0.5391414141414141,0.5396825396825397,0.49999999999999994,0.09242424242424152,2,0.538762629032135,0.6895003914833069,5.609651803970337,105,48,0.05,0.2,0.0002,64,32,"[[41, 19], [39, 27]]"

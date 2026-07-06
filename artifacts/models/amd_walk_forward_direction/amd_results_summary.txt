@@ -1,0 +1,21 @@
+AMD robustness walk-forward results
+
+Dataset:
+- Input: /home/zammorak/thesis/data/model_feed/amd_model_dataset.csv
+- Model rows: 1,032
+- Feature count: 28
+- OOS rows: 315
+- OOS period: 2024-10-18 to 2026-01-29
+- Folds: 5
+
+Overall results:
+- OOS AUC: 0.4690709145306056
+- OOS accuracy: 0.4984126984126984
+- Confusion matrix: [[90, 59], [99, 67]]
+- Long-only Sharpe: -0.2572829455335127
+- Average daily strategy return: -0.0004255590349664372
+- Trade rate: 0.4
+
+Interpretation:
+The AMD robustness check did not confirm generalization of the LSTM directional signal.
+Performance was close to random by accuracy, below random by AUC, and economically unattractive based on the negative long-only Sharpe ratio.
