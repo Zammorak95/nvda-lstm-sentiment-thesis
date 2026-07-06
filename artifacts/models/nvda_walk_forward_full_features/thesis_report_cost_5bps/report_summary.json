@@ -1,0 +1,43 @@
+{
+  "classification": {
+    "oos_auc": 0.5135468290105909,
+    "oos_acc": 0.5149911816578483,
+    "trade_rate": 0.4021164021164021,
+    "brier": 0.2607267123533972
+  },
+  "cost_bps": 5.0,
+  "statsmodels_available": true,
+  "trading": {
+    "annualized_sharpe": 0.9795193252293487,
+    "max_drawdown": -0.44870224973436823,
+    "mean_daily_return": 0.0013048207262845192,
+    "std_daily_return": 0.02114648108528047,
+    "ttest": {
+      "t_mean": 0.0013048207262845192,
+      "t_stat": 1.4679827555777134,
+      "t_p_approx": 0.14210890712048085,
+      "n": 567
+    },
+    "hac_test": {
+      "hac_available": true,
+      "hac_mean": 0.0013048207262845194,
+      "hac_se": 0.0009154587446487287,
+      "hac_t": 1.4253189823263888,
+      "hac_p": 0.15406501544643292,
+      "hac_lags": 5
+    },
+    "bootstrap_sharpe": {
+      "sharpe_boot_mean": 1.0103536325318339,
+      "sharpe_ci_2p5": -0.32821686737930483,
+      "sharpe_ci_50": 1.011084388921852,
+      "sharpe_ci_97p5": 2.384784599576658
+    },
+    "permutation_test": {
+      "perm_obs_mean": 0.0013048207262845192,
+      "perm_pvalue_one_sided": 0.3263368315842079
+    },
+    "num_days": 567,
+    "num_trades": 228
+  },
+  "summary_json_used": "/home/zammorak/thesis/artifacts/models/nvda_walk_forward_full_features/walk_forward_summary.json"
+}

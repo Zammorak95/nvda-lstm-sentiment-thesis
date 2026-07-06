@@ -1,0 +1,65 @@
+{
+  "task": "direction_classification",
+  "target": "target_direction",
+  "lookback": 30,
+  "val_size": 126,
+  "test_size": 252,
+  "threshold_used": 0.3,
+  "auto_threshold": true,
+  "feature_cols": [
+    "log_return",
+    "overnight_return",
+    "momentum_5d",
+    "momentum_20d",
+    "volatility_20d",
+    "volume_change",
+    "volume_20d_avg",
+    "avg_sentiment",
+    "sentiment_std",
+    "news_count",
+    "spy_return",
+    "soxx_return",
+    "ief_return",
+    "trends_zscore_30d",
+    "trends_momentum_7d",
+    "trends_spike"
+  ],
+  "val_metrics": {
+    "accuracy": 0.5555555555555556,
+    "auc": 0.4949494949494949,
+    "confusion_matrix": [
+      [
+        6,
+        54
+      ],
+      [
+        2,
+        64
+      ]
+    ]
+  },
+  "test_metrics": {
+    "accuracy": 0.5476190476190477,
+    "auc": 0.5471913678197398,
+    "confusion_matrix": [
+      [
+        12,
+        103
+      ],
+      [
+        11,
+        126
+      ]
+    ]
+  },
+  "strategy": {
+    "sharpe_long_only": 0.5124044437241061,
+    "avg_daily_return_long_only": 0.0009706766609722583
+  },
+  "hip_visible_devices": "0",
+  "lstm": {
+    "implementation": 1,
+    "dropout": 0.1,
+    "recurrent_dropout": 0.2
+  }
+}

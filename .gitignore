@@ -41,3 +41,23 @@ misc/Error.txt
 .DS_Store
 Thumbs.db
 src/*.egg-info/
+
+# Local Python environments
+.venv/
+**/.venv/
+
+# Raw/intermediate/local data
+data/raw/
+data/interim/
+data/processed/
+artifacts/data/
+*.part
+
+# Old local dumps / copied environments
+artifacts/sort/
+artifacts/models/OLD/
+
+# Local caches
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/

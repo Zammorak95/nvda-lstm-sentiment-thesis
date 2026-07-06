@@ -1,0 +1,33 @@
+{
+  "fold": 2,
+  "train_end_date": "2024-01-18",
+  "test_start_date": "2024-01-19",
+  "test_end_date": "2024-04-18",
+  "val_auc": 0.569701646090535,
+  "val_acc": 0.5634920634920635,
+  "threshold": 0.5,
+  "youden_j": null,
+  "test_auc": 0.5153061224489797,
+  "test_acc": 0.5238095238095238,
+  "test_cm": [
+    [
+      13,
+      15
+    ],
+    [
+      15,
+      20
+    ]
+  ],
+  "train_seconds": 24.733989715576172,
+  "params": {
+    "lookback": 105,
+    "lstm_units": 48,
+    "dense_units": 32,
+    "lr": 0.0002,
+    "dropout": 0.05,
+    "recurrent_dropout": 0.2,
+    "batch": 64,
+    "epochs": 30
+  }
+}

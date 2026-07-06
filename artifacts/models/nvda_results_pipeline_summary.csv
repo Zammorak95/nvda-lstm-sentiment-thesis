@@ -1,0 +1,4 @@
+run,path,status,auc,acc,sharpe,trade_rate,feature_count,val_auc,val_acc,test_auc,test_acc,threshold
+nvda_full_features,/home/zammorak/thesis/artifacts/models/nvda_walk_forward_full_features/walk_forward_summary.json,ok,0.5135468290105909,0.5149911816578483,1.1293916775920374,0.4021164021164021,28.0,,,,,
+nvda_reduced_features,/home/zammorak/thesis/artifacts/models/nvda_walk_forward_reduced_features/walk_forward_summary.json,ok,0.5170435963875122,0.5291005291005291,1.2025961934400495,0.7407407407407407,13.0,,,,,
+nvda_random_search_reduced,/home/zammorak/thesis/artifacts/models/nvda_random_search_reduced_features/best/meta.json,ok,,,,,,0.6435291126366641,0.5793650793650794,0.5338488843813388,0.5158730158730159,0.35

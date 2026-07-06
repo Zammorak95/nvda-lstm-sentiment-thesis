@@ -1,0 +1,49 @@
+{
+  "best_trial": 11,
+  "params": {
+    "lookback": 45,
+    "lstm_units": 96,
+    "dense_units": 64,
+    "dropout": 0.08,
+    "recurrent_dropout": 0.15,
+    "lr": 0.0003,
+    "batch": 16
+  },
+  "val_auc": 0.5906432748538012,
+  "val_acc": 0.5714285714285714,
+  "threshold": 0.35,
+  "youden_j": 0.14416475972539972,
+  "feature_cols": [
+    "log_return",
+    "overnight_return",
+    "momentum_5d",
+    "momentum_20d",
+    "volatility_20d",
+    "volume_change",
+    "volume_20d_avg",
+    "avg_sentiment",
+    "sentiment_std",
+    "news_count",
+    "spy_return",
+    "soxx_return",
+    "ief_return",
+    "trends_zscore_30d",
+    "trends_momentum_7d",
+    "trends_spike"
+  ],
+  "hip_visible_devices": "0",
+  "data": "/home/zammorak/thesis/data/model_feed/nvda_model_dataset_clean.csv",
+  "test_auc": 0.4771805273833671,
+  "test_acc": 0.4801587301587302,
+  "test_cm_tn_fp_fn_tp": [
+    [
+      22,
+      94
+    ],
+    [
+      37,
+      99
+    ]
+  ],
+  "evaluated_at": "2026-07-05 17:36:15"
+}

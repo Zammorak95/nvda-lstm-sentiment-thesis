@@ -1,0 +1,42 @@
+{
+  "best_trial": 14,
+  "params": {
+    "lookback": 45,
+    "lstm_units": 32,
+    "dropout": 0.1,
+    "recurrent_dropout": 0.2,
+    "lr": 0.0003,
+    "batch": 64,
+    "dense_units": 16
+  },
+  "val_auc": 0.5651515151515152,
+  "val_acc": 0.47619047619047616,
+  "threshold": 0.5,
+  "youden_j": null,
+  "feature_cols": [
+    "log_return",
+    "overnight_return",
+    "momentum_5d",
+    "momentum_20d",
+    "volatility_20d",
+    "volume_change",
+    "volume_20d_avg",
+    "avg_sentiment",
+    "sentiment_std",
+    "news_count"
+  ],
+  "hip_visible_devices": "0",
+  "test_auc": 0.4469692161218661,
+  "test_acc": 0.45634920634920634,
+  "test_cm_tn_fp_fn_tp": [
+    [
+      115,
+      0
+    ],
+    [
+      137,
+      0
+    ]
+  ],
+  "evaluated_at": "2026-05-06 15:26:02"
+}

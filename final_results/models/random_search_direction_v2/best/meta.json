@@ -1,0 +1,48 @@
+{
+  "best_trial": 48,
+  "params": {
+    "lookback": 45,
+    "lstm_units": 64,
+    "dense_units": 64,
+    "dropout": 0.1,
+    "recurrent_dropout": 0.15,
+    "lr": 0.0002,
+    "batch": 16
+  },
+  "val_auc": 0.5797979797979798,
+  "val_acc": 0.5238095238095238,
+  "threshold": 0.6,
+  "youden_j": 0.08030303030302928,
+  "feature_cols": [
+    "log_return",
+    "overnight_return",
+    "momentum_5d",
+    "momentum_20d",
+    "volatility_20d",
+    "volume_change",
+    "volume_20d_avg",
+    "avg_sentiment",
+    "sentiment_std",
+    "news_count",
+    "spy_return",
+    "soxx_return",
+    "ief_return",
+    "trends_zscore_30d",
+    "trends_momentum_7d",
+    "trends_spike"
+  ],
+  "hip_visible_devices": "0",
+  "test_auc": 0.5242145350682323,
+  "test_acc": 0.4801587301587302,
+  "test_cm_tn_fp_fn_tp": [
+    [
+      101,
+      14
+    ],
+    [
+      117,
+      20
+    ]
+  ],
+  "evaluated_at": "2026-03-04 22:37:54"
+}

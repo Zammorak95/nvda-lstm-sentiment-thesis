@@ -1,0 +1,49 @@
+{
+  "best_trial": 7,
+  "params": {
+    "lookback": 105,
+    "lstm_units": 96,
+    "dense_units": 64,
+    "dropout": 0.02,
+    "recurrent_dropout": 0.15,
+    "lr": 0.0002,
+    "batch": 64
+  },
+  "val_auc": 0.6388608870967742,
+  "val_acc": 0.6190476190476191,
+  "threshold": 0.49999999999999994,
+  "youden_j": 0.24042338709677008,
+  "feature_cols": [
+    "log_return",
+    "overnight_return",
+    "momentum_5d",
+    "momentum_20d",
+    "volatility_20d",
+    "volume_change",
+    "volume_20d_avg",
+    "avg_sentiment",
+    "sentiment_std",
+    "news_count",
+    "spy_return",
+    "soxx_return",
+    "ief_return",
+    "trends_zscore_30d",
+    "trends_momentum_7d",
+    "trends_spike"
+  ],
+  "hip_visible_devices": "0",
+  "data": "/home/zammorak/thesis/data/model_feed/amd_model_dataset_clean.csv",
+  "test_auc": 0.5163799645838604,
+  "test_acc": 0.47619047619047616,
+  "test_cm_tn_fp_fn_tp": [
+    [
+      90,
+      28
+    ],
+    [
+      104,
+      30
+    ]
+  ],
+  "evaluated_at": "2026-07-05 17:54:48"
+}

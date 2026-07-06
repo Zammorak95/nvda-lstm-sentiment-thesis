@@ -1,0 +1,33 @@
+{
+  "fold": 9,
+  "train_end_date": "2025-10-21",
+  "test_start_date": "2025-10-22",
+  "test_end_date": "2026-01-29",
+  "val_auc": 0.5149176954732511,
+  "val_acc": 0.48412698412698413,
+  "threshold": 0.49999999999999994,
+  "youden_j": 0.03240740740740816,
+  "test_auc": 0.590909090909091,
+  "test_acc": 0.47619047619047616,
+  "test_cm": [
+    [
+      29,
+      1
+    ],
+    [
+      32,
+      1
+    ]
+  ],
+  "train_seconds": 19.844290733337402,
+  "params": {
+    "lookback": 45,
+    "lstm_units": 96,
+    "dense_units": 64,
+    "lr": 0.0003,
+    "dropout": 0.08,
+    "recurrent_dropout": 0.15,
+    "batch": 16,
+    "epochs": 20
+  }
+}

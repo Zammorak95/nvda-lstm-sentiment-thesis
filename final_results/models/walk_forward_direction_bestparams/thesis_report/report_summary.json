@@ -1,0 +1,42 @@
+{
+  "classification": {
+    "oos_auc": 0.550643920654932,
+    "oos_acc": 0.5178571428571429,
+    "trade_rate": 0.5396825396825397,
+    "brier": 0.2496443881622522
+  },
+  "cost_bps": 5.0,
+  "statsmodels_available": true,
+  "trading": {
+    "annualized_sharpe": 0.7880811258401624,
+    "max_drawdown": -0.3074433916149424,
+    "mean_daily_return": 0.0010207498660251763,
+    "std_daily_return": 0.020561210320264853,
+    "ttest": {
+      "t_mean": 0.0010207498660251763,
+      "t_stat": 1.1134087977622535,
+      "t_p_approx": 0.2655328982201388,
+      "n": 504
+    },
+    "hac_test": {
+      "hac_available": true,
+      "hac_mean": 0.0010207498660251765,
+      "hac_se": 0.0008499729746522455,
+      "hac_t": 1.2009203780188447,
+      "hac_p": 0.22978208866105054,
+      "hac_lags": 5
+    },
+    "bootstrap_sharpe": {
+      "sharpe_boot_mean": 0.7924733701067639,
+      "sharpe_ci_2p5": -0.6366031590460182,
+      "sharpe_ci_50": 0.8023862814993157,
+      "sharpe_ci_97p5": 2.192057263734428
+    },
+    "permutation_test": {
+      "perm_obs_mean": 0.0010207498660251763,
+      "perm_pvalue_one_sided": 0.7781109445277361
+    },
+    "num_days": 504,
+    "num_trades": 272
+  }
+}

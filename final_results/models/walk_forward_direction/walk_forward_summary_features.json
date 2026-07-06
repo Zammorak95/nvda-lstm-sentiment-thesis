@@ -1,0 +1,290 @@
+{
+  "overall": {
+    "auc": 0.5338876210842124,
+    "acc": 0.5059523809523809,
+    "cm": [
+      [
+        130,
+        93
+      ],
+      [
+        156,
+        125
+      ]
+    ],
+    "strategy": {
+      "sharpe_long_only": 1.8332145114125356,
+      "avg_daily_return_long_only": 0.0021011734387646358,
+      "trade_rate_long_only": 0.43253968253968256
+    }
+  },
+  "folds": [
+    {
+      "fold": 1,
+      "train_end_date": "2023-10-16",
+      "test_start_date": "2023-10-17",
+      "test_end_date": "2024-01-18",
+      "val_auc": 0.5451555780419934,
+      "val_acc": 0.5317460317460317,
+      "threshold": 0.5,
+      "youden_j": null,
+      "test_auc": 0.5908119658119658,
+      "test_acc": 0.5555555555555556,
+      "test_cm": [
+        [
+          13,
+          11
+        ],
+        [
+          17,
+          22
+        ]
+      ],
+      "train_seconds": 26.797990322113037,
+      "params": {
+        "lookback": 60,
+        "lstm_units": 32,
+        "dense_units": 64,
+        "lr": 0.0002,
+        "dropout": 0.05,
+        "recurrent_dropout": 0.2,
+        "batch": 32,
+        "epochs": 30
+      }
+    },
+    {
+      "fold": 2,
+      "train_end_date": "2024-01-18",
+      "test_start_date": "2024-01-19",
+      "test_end_date": "2024-04-18",
+      "val_auc": 0.57690329218107,
+      "val_acc": 0.5555555555555556,
+      "threshold": 0.5,
+      "youden_j": null,
+      "test_auc": 0.536734693877551,
+      "test_acc": 0.47619047619047616,
+      "test_cm": [
+        [
+          2,
+          26
+        ],
+        [
+          7,
+          28
+        ]
+      ],
+      "train_seconds": 15.8574538230896,
+      "params": {
+        "lookback": 60,
+        "lstm_units": 32,
+        "dense_units": 64,
+        "lr": 0.0002,
+        "dropout": 0.05,
+        "recurrent_dropout": 0.2,
+        "batch": 32,
+        "epochs": 30
+      }
+    },
+    {
+      "fold": 3,
+      "train_end_date": "2024-04-18",
+      "test_start_date": "2024-04-19",
+      "test_end_date": "2024-07-19",
+      "val_auc": 0.5626299376299376,
+      "val_acc": 0.5873015873015873,
+      "threshold": 0.5,
+      "youden_j": null,
+      "test_auc": 0.6358024691358024,
+      "test_acc": 0.5714285714285714,
+      "test_cm": [
+        [
+          24,
+          3
+        ],
+        [
+          24,
+          12
+        ]
+      ],
+      "train_seconds": 29.713436603546143,
+      "params": {
+        "lookback": 60,
+        "lstm_units": 32,
+        "dense_units": 64,
+        "lr": 0.0002,
+        "dropout": 0.05,
+        "recurrent_dropout": 0.2,
+        "batch": 32,
+        "epochs": 30
+      }
+    },
+    {
+      "fold": 4,
+      "train_end_date": "2024-07-19",
+      "test_start_date": "2024-07-22",
+      "test_end_date": "2024-10-17",
+      "val_auc": 0.5390524967989757,
+      "val_acc": 0.5158730158730159,
+      "threshold": 0.5,
+      "youden_j": null,
+      "test_auc": 0.45,
+      "test_acc": 0.42857142857142855,
+      "test_cm": [
+        [
+          24,
+          4
+        ],
+        [
+          32,
+          3
+        ]
+      ],
+      "train_seconds": 43.25377869606018,
+      "params": {
+        "lookback": 60,
+        "lstm_units": 32,
+        "dense_units": 64,
+        "lr": 0.0002,
+        "dropout": 0.05,
+        "recurrent_dropout": 0.2,
+        "batch": 32,
+        "epochs": 30
+      }
+    },
+    {
+      "fold": 5,
+      "train_end_date": "2024-10-17",
+      "test_start_date": "2024-10-18",
+      "test_end_date": "2025-01-21",
+      "val_auc": 0.5702944942381561,
+      "val_acc": 0.5476190476190477,
+      "threshold": 0.5,
+      "youden_j": null,
+      "test_auc": 0.6370967741935483,
+      "test_acc": 0.6031746031746031,
+      "test_cm": [
+        [
+          15,
+          17
+        ],
+        [
+          8,
+          23
+        ]
+      ],
+      "train_seconds": 46.02563214302063,
+      "params": {
+        "lookback": 60,
+        "lstm_units": 32,
+        "dense_units": 64,
+        "lr": 0.0002,
+        "dropout": 0.05,
+        "recurrent_dropout": 0.2,
+        "batch": 32,
+        "epochs": 30
+      }
+    },
+    {
+      "fold": 6,
+      "train_end_date": "2025-01-21",
+      "test_start_date": "2025-01-22",
+      "test_end_date": "2025-04-22",
+      "val_auc": 0.49823232323232325,
+      "val_acc": 0.4603174603174603,
+      "threshold": 0.5,
+      "youden_j": null,
+      "test_auc": 0.4696969696969697,
+      "test_acc": 0.49206349206349204,
+      "test_cm": [
+        [
+          29,
+          1
+        ],
+        [
+          31,
+          2
+        ]
+      ],
+      "train_seconds": 15.77021861076355,
+      "params": {
+        "lookback": 60,
+        "lstm_units": 32,
+        "dense_units": 64,
+        "lr": 0.0002,
+        "dropout": 0.05,
+        "recurrent_dropout": 0.2,
+        "batch": 32,
+        "epochs": 30
+      }
+    },
+    {
+      "fold": 7,
+      "train_end_date": "2025-04-22",
+      "test_start_date": "2025-04-23",
+      "test_end_date": "2025-07-23",
+      "val_auc": 0.6118951612903226,
+      "val_acc": 0.5396825396825397,
+      "threshold": 0.5,
+      "youden_j": null,
+      "test_auc": 0.5643015521064302,
+      "test_acc": 0.4444444444444444,
+      "test_cm": [
+        [
+          22,
+          0
+        ],
+        [
+          35,
+          6
+        ]
+      ],
+      "train_seconds": 52.29240322113037,
+      "params": {
+        "lookback": 60,
+        "lstm_units": 32,
+        "dense_units": 64,
+        "lr": 0.0002,
+        "dropout": 0.05,
+        "recurrent_dropout": 0.2,
+        "batch": 32,
+        "epochs": 30
+      }
+    },
+    {
+      "fold": 8,
+      "train_end_date": "2025-07-23",
+      "test_start_date": "2025-07-24",
+      "test_end_date": "2025-10-21",
+      "val_auc": 0.5090956340956341,
+      "val_acc": 0.6031746031746031,
+      "threshold": 0.5,
+      "youden_j": null,
+      "test_auc": 0.6169354838709677,
+      "test_acc": 0.47619047619047616,
+      "test_cm": [
+        [
+          1,
+          31
+        ],
+        [
+          2,
+          29
+        ]
+      ],
+      "train_seconds": 17.9312744140625,
+      "params": {
+        "lookback": 60,
+        "lstm_units": 32,
+        "dense_units": 64,
+        "lr": 0.0002,
+        "dropout": 0.05,
+        "recurrent_dropout": 0.2,
+        "batch": 32,
+        "epochs": 30
+      }
+    }
+  ],
+  "saved_predictions": "/home/zammorak/thesis/models/walk_forward_direction/walk_forward_oos_predictions.csv",
+  "hip_visible_devices": "0",
+  "feature_count": 16
+}

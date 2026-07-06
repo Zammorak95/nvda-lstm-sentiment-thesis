@@ -1,0 +1,31 @@
+{
+  "params": {
+    "lookback": 90,
+    "lstm_units": 96,
+    "dropout": 0.1,
+    "recurrent_dropout": 0.2,
+    "lr": 0.0003,
+    "batch": 64
+  },
+  "val_auc": 0.6090909090909091,
+  "val_acc": 0.5634920634920635,
+  "threshold": 0.5,
+  "feature_cols": [
+    "log_return",
+    "overnight_return",
+    "momentum_5d",
+    "momentum_20d",
+    "volatility_20d",
+    "volume_change",
+    "volume_20d_avg",
+    "avg_sentiment",
+    "sentiment_std",
+    "news_count",
+    "spy_return",
+    "soxx_return",
+    "ief_return",
+    "trends_zscore_30d",
+    "trends_momentum_7d",
+    "trends_spike"
+  ]
+}
