@@ -1,0 +1,4 @@
+feature_1,feature_2,pearson_corr
+spy_return,soxx_return,0.8179
+log_return,soxx_return,0.8103
+trends_zscore_30d,trends_spike,0.737
