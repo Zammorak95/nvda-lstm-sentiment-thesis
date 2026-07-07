@@ -1,0 +1,17 @@
+,corr_target_direction,corr_target_next_return,max_abs_corr
+trends_zscore_30d,0.0183,0.0755,0.0755
+trends_spike,0.0288,0.0661,0.0661
+soxx_return,-0.0014,-0.0482,0.0482
+log_return,-0.0005,-0.0432,0.0432
+volume_change,0.0008,0.043,0.043
+ief_return,0.0418,0.0012,0.0418
+volatility_20d,-0.0404,-0.0337,0.0404
+spy_return,-0.014,-0.0381,0.0381
+momentum_5d,-0.0377,-0.0353,0.0377
+trends_momentum_7d,0.0008,0.0373,0.0373
+momentum_20d,-0.0335,0.0028,0.0335
+avg_sentiment,-0.0325,-0.0308,0.0325
+volume_20d_avg,-0.0087,-0.0323,0.0323
+sentiment_std,0.0151,0.0195,0.0195
+overnight_return,0.0186,0.0004,0.0186
+news_count,-0.0173,0.0063,0.0173
