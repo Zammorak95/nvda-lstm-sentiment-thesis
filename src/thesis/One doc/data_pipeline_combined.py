@@ -1,29 +1,4 @@
 #!/usr/bin/env python3
-"""
-data_pipeline_combined.py
-
-One CLI for the thesis dataset pipeline:
-- combine raw news CSVs
-- clean / trading-align news headlines
-- build daily VADER sentiment factors
-- process EOD stock data
-- process Google Trends data
-- build the final model dataset
-- validate the final dataset in console
-- write an Excel audit report
-
-Examples:
-  python data_pipeline_combined.py news-combine
-  python data_pipeline_combined.py news-clean
-  python data_pipeline_combined.py news-sentiment
-  python data_pipeline_combined.py stock-clean --symbol NVDA --input /path/NVDA.csv --output /path/NVDA_eod_processed.csv
-  python data_pipeline_combined.py trends-clean
-  python data_pipeline_combined.py build-model
-  python data_pipeline_combined.py validate
-  python data_pipeline_combined.py audit
-  python data_pipeline_combined.py all
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -35,10 +10,6 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-
-# -----------------------------------------------------------------------------
-# Default project paths
-# -----------------------------------------------------------------------------
 BASE_DIR = Path("/home/zammorak/thesis/data")
 
 RAW_NEWS_DIR = BASE_DIR / "raw/news_headlines"
@@ -65,9 +36,6 @@ DEFAULT_STOCK_OUTPUTS = {
 }
 
 
-# -----------------------------------------------------------------------------
-# Helpers
-# -----------------------------------------------------------------------------
 def ensure_parent(path: str | Path) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -83,14 +51,11 @@ def standardize_columns(cols: Iterable[object]) -> pd.Index:
 
 
 def print_done(message: str, path: str | Path | None = None) -> None:
-    print(f"✅ {message}")
+    print(f"Done: {message}")
     if path is not None:
         print(f"Saved to: {path}")
 
 
-# -----------------------------------------------------------------------------
-# News: combine raw CSVs
-# -----------------------------------------------------------------------------
 def combine_all_news_csvs(
     folder_path: str | Path = RAW_NEWS_DIR,
     output_path: str | Path = NEWS_MASTER_PATH,
@@ -145,9 +110,6 @@ def combine_all_news_csvs(
     return combined
 
 
-# -----------------------------------------------------------------------------
-# News: clean and trading-align
-# -----------------------------------------------------------------------------
 def clean_news_dataset(
     input_path: str | Path = NEWS_MASTER_PATH,
     output_path: str | Path = NEWS_CLEAN_PATH,
@@ -171,10 +133,8 @@ def clean_news_dataset(
     df["published_at"] = pd.to_datetime(df["published_at"], errors="coerce", utc=True)
     df = df[df["published_at"].notna()]
 
-    # US equities trading alignment: 16:00 ET close.
     df["published_et"] = df["published_at"].dt.tz_convert("America/New_York")
     df["weekday_et"] = df["published_et"].dt.weekday
-    df = df[df["weekday_et"] < 5].copy()
 
     df["trading_date"] = df["published_et"].dt.floor("D")
     after_close_mask = df["published_et"].dt.hour >= 16
@@ -202,9 +162,6 @@ def clean_news_dataset(
     return df
 
 
-# -----------------------------------------------------------------------------
-# News: sentiment
-# -----------------------------------------------------------------------------
 def build_daily_sentiment(
     input_path: str | Path = NEWS_CLEAN_PATH,
     output_path: str | Path = NEWS_SENTIMENT_PATH,
@@ -236,9 +193,6 @@ def build_daily_sentiment(
     return daily
 
 
-# -----------------------------------------------------------------------------
-# Stock EOD processing
-# -----------------------------------------------------------------------------
 def clean_and_process_eod(
     input_path: str | Path,
     output_path: str | Path,
@@ -277,9 +231,6 @@ def clean_and_process_eod(
     return df
 
 
-# -----------------------------------------------------------------------------
-# Trends processing
-# -----------------------------------------------------------------------------
 def clean_and_process_trends(
     input_path: str | Path = TRENDS_RAW_PATH,
     output_path: str | Path = TRENDS_PROCESSED_PATH,
@@ -313,9 +264,6 @@ def clean_and_process_trends(
     return df
 
 
-# -----------------------------------------------------------------------------
-# Build model dataset
-# -----------------------------------------------------------------------------
 def build_model_dataset(
     nvda_path: str | Path = DEFAULT_STOCK_OUTPUTS["NVDA"],
     spy_path: str | Path = DEFAULT_STOCK_OUTPUTS["SPY"],
@@ -362,9 +310,6 @@ def build_model_dataset(
     return df
 
 
-# -----------------------------------------------------------------------------
-# Validation and audit
-# -----------------------------------------------------------------------------
 def dataset_validation_tables(data_path: str | Path = MODEL_DATASET_PATH) -> dict[str, pd.DataFrame]:
     df = pd.read_csv(data_path)
     df["date"] = pd.to_datetime(df["date"])
@@ -396,12 +341,12 @@ def dataset_validation_tables(data_path: str | Path = MODEL_DATASET_PATH) -> dic
     })
     missing_table = missing_table[missing_table["missing_count"] > 0]
     if missing_table.empty:
-        missing_table = pd.DataFrame({"note": ["No missing values detected ✅"]})
+        missing_table = pd.DataFrame({"note": ["No missing values detected"]})
 
     zero_var_table = df.nunique(dropna=False)
     zero_var_table = zero_var_table[zero_var_table <= 1].sort_values().to_frame("n_unique_values")
     if zero_var_table.empty:
-        zero_var_table = pd.DataFrame({"note": ["No zero-variance columns ✅"]})
+        zero_var_table = pd.DataFrame({"note": ["No zero-variance columns"]})
 
     sanity_rows = []
     for col, label in [
@@ -516,9 +461,9 @@ def write_audit_workbook(
 
         write_sheet(tables["basic_info"], "Basic_Info", index=False)
         write_sheet(tables["dup_summary"], "Duplicate_Dates", index=False)
-        write_sheet(tables["duplicate_dates"].set_index("date") if not tables["duplicate_dates"].empty else pd.DataFrame({"note": ["No duplicate dates ✅"]}), "Duplicate_Dates_List")
+        write_sheet(tables["duplicate_dates"].set_index("date") if not tables["duplicate_dates"].empty else pd.DataFrame({"note": ["No duplicate dates"]}), "Duplicate_Dates_List")
         write_sheet(tables["max_gap"], "Date_Gaps", index=False)
-        write_sheet(tables["large_gaps"].set_index("date") if not tables["large_gaps"].empty else pd.DataFrame({"note": ["No large gaps >3 days ✅"]}), "Large_Gaps_List")
+        write_sheet(tables["large_gaps"].set_index("date") if not tables["large_gaps"].empty else pd.DataFrame({"note": ["No large gaps >3 days"]}), "Large_Gaps_List")
         write_sheet(tables["missing_table"], "Missing_Values")
         write_sheet(tables["zero_var_table"], "Zero_Variance")
         write_sheet(tables["sanity_checks"], "Sanity_Checks", index=False)
@@ -529,9 +474,6 @@ def write_audit_workbook(
     print_done("Wrote audit workbook", out_path)
 
 
-# -----------------------------------------------------------------------------
-# CLI
-# -----------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Combined thesis data pipeline utility.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -554,7 +496,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--input", default=None, help="Defaults to the configured path for --symbol.")
     p.add_argument("--output", default=None, help="Defaults to the configured processed path for --symbol.")
 
-    p = sub.add_parser("stock-clean-all", help="Clean/process NVDA, SPY, SOXX, and IEF using default paths.")
+    sub.add_parser("stock-clean-all", help="Clean/process NVDA, SPY, SOXX, and IEF using default paths.")
 
     p = sub.add_parser("trends-clean", help="Clean and feature-engineer Google Trends data.")
     p.add_argument("--input", default=str(TRENDS_RAW_PATH))
@@ -588,40 +530,31 @@ def main() -> None:
     if args.command == "news-combine":
         df = combine_all_news_csvs(args.folder, args.output, args.recursive)
         print_done(f"Combined news CSVs. Rows: {len(df):,}; Columns: {len(df.columns):,}", args.output)
-
     elif args.command == "news-clean":
         df = clean_news_dataset(args.input, args.output)
         print_done(f"Cleaned and trading-aligned news. Rows: {len(df):,}; Columns: {len(df.columns):,}", args.output)
-
     elif args.command == "news-sentiment":
         df = build_daily_sentiment(args.input, args.output)
         print_done(f"Built daily sentiment. Rows: {len(df):,}; Columns: {len(df.columns):,}", args.output)
-
     elif args.command == "stock-clean":
         input_path = Path(args.input) if args.input else DEFAULT_STOCK_INPUTS[args.symbol]
         output_path = Path(args.output) if args.output else DEFAULT_STOCK_OUTPUTS[args.symbol]
         df = clean_and_process_eod(input_path, output_path)
         print_done(f"Processed {args.symbol} EOD. Rows: {len(df):,}; Columns: {len(df.columns):,}", output_path)
-
     elif args.command == "stock-clean-all":
         for symbol in ["NVDA", "SPY", "SOXX", "IEF"]:
             df = clean_and_process_eod(DEFAULT_STOCK_INPUTS[symbol], DEFAULT_STOCK_OUTPUTS[symbol])
             print_done(f"Processed {symbol} EOD. Rows: {len(df):,}; Columns: {len(df.columns):,}", DEFAULT_STOCK_OUTPUTS[symbol])
-
     elif args.command == "trends-clean":
         df = clean_and_process_trends(args.input, args.output)
         print_done(f"Processed trends. Rows: {len(df):,}; Columns: {len(df.columns):,}", args.output)
-
     elif args.command == "build-model":
         df = build_model_dataset(args.nvda, args.spy, args.soxx, args.ief, args.sentiment, args.trends, args.output)
         print_done(f"Built model dataset. Rows: {len(df):,}; Columns: {len(df.columns):,}", args.output)
-
     elif args.command == "validate":
         validate_dataset(args.input)
-
     elif args.command == "audit":
         write_audit_workbook(args.input, args.output)
-
     elif args.command == "all":
         df = combine_all_news_csvs(RAW_NEWS_DIR, NEWS_MASTER_PATH, recursive=args.recursive_news)
         print_done(f"Combined news CSVs. Rows: {len(df):,}", NEWS_MASTER_PATH)
